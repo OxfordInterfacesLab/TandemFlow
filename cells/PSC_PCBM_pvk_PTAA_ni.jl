@@ -351,6 +351,7 @@ function main(;
 
     # DEBUG: Find peak and minimum of Beer-Lambert generation in the absorber
     subg = subgrid(grid, [2])
+    println("\nBEER-LAMBERT GENERATION PROFILE INFO")
     println("PEAK: $(BeerLambert(ctsys, 2, subg[Coordinates])[1])")
     println("MIN: $(BeerLambert(ctsys, 2, subg[Coordinates])[end])")
 
@@ -435,7 +436,8 @@ function main(;
             e_dens = get_density(solution, regionIntrinsic, ctsys, iphin)
             h_dens = get_density(solution, regionIntrinsic, ctsys, iphip)
 
-            println("\nPVK-ETL INTERFACE")
+            println("\nINTERFACE CARRIER DENSITIES")
+            println("PVK-ETL INTERFACE")
             println("Electron Concentration: $(e_dens[1])")
             println("Hole Concentration: $(h_dens[1])")
             println("\nPVK-HTL INTERFACE")
@@ -470,7 +472,7 @@ function main(;
     efficiency = biasValues[indexPD] * IV[indexPD] / IncidentLightPowerDensity
     fillfactor = (biasValues[indexPD] * IV[indexPD]) / (IV[1] * Voc)
 
-    println("\nPARAMETERS")
+    println("\nSOLAR CELL PARAMETERS")
     println("Isc = $(Isc))")
     println("Voc = $(Voc)")
     println("FF = $(fillfactor)")
