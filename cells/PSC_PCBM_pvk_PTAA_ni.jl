@@ -15,9 +15,6 @@ ENV["MPLBACKEND"] = "qt5agg"
 using ChargeTransport
 using ExtendableGrids
 using PyPlot
-using Statistics
-using CSV
-using DataFrames
 
 # Plotting via SciencePlots framework
 using PyCall
