@@ -34,6 +34,19 @@ function middle_element(A)
     return A[idx]
 end
 
+function carrier_densities(solution, ctsys, regionIntrinsic, iphin, iphip)
+    e_dens = get_density(solution, regionIntrinsic, ctsys, iphin)
+    h_dens = get_density(solution, regionIntrinsic, ctsys, iphip)
+
+    println("\nINTERFACE CARRIER DENSITIES")
+    println("PVK-HTL INTERFACE")
+    println("Electron Concentration: $(e_dens[1])")
+    println("Hole Concentration: $(h_dens[1])")
+    println("\nPVK-ETL INTERFACE")
+    println("Electron Concentration: $(e_dens[end])")
+    println("Hole Concentration: $(h_dens[end])\n")
+end
+
 function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
@@ -134,7 +147,7 @@ function main(;
     ################################################################################
 
     data = Data(grid, numberOfCarriers)
-    data.modelType = Stationary
+    data.modelType = Transient
 
     carrier_stats = Boltzmann
     data.F = [carrier_stats, carrier_stats, FermiDiracMinusOne]
@@ -146,7 +159,7 @@ function main(;
         bulk_recomb_SRH = true
     )
 
-    data.generationModel = GenerationBeerLambert
+    data.generationModel = GenerationUniform
 
     data.boundaryType[bregionAcceptor] = OhmicContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
@@ -207,12 +220,12 @@ function main(;
         end
         
         # Beer-Lambert generation for now
-        params.generationIncidentPhotonFlux[ireg] = incidentPhotonFlux[ireg]
-        params.generationAbsorption[ireg] = absorption[ireg]
-        #params.generationUniform[ireg] = generation_uniform[ireg]
+        # params.generationIncidentPhotonFlux[ireg] = incidentPhotonFlux[ireg]
+        # params.generationAbsorption[ireg] = absorption[ireg]
+        params.generationUniform[ireg] = generation_uniform[ireg]
     end
 
-    params.generationPeak = generationPeak
+    # params.generationPeak = generationPeak
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
@@ -294,6 +307,10 @@ function main(;
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
 
+    # COMPARE: Find carrier densities at interfaces and compare to SCAPS results
+    println("\nDARK EQUILIBRIUM\n")
+    carrier_densities(solution, ctsys, regionIntrinsic, iphin, iphip)
+
     if plotting == true
         ################################################################################
         println("Plot electroneutral potential, band-edge energies and doping")
@@ -311,12 +328,12 @@ function main(;
     println("Built-in Voltage: $(Vbi)V")
 
     # Plot equilibrium voltage profile
-    if plotting
-        Plotter.figure()
-        plot_solution(Plotter, ctsys, solution, "Equilibrium, Dark", label_solution)
+    # if plotting
+    #     Plotter.figure()
+    #     plot_solution(Plotter, ctsys, solution, "Equilibrium, Dark", label_solution)
 
-        Plotter.show()
-    end
+    #     Plotter.show()
+    # end
 
     solution_dark = solution
 
@@ -346,11 +363,15 @@ function main(;
 
     end # generation loop
 
+    # COMPARE: Illuminated equilibrium carrier densities at interfaces
+    println("\nILLUMINATED EQUILIBRIUM")
+    carrier_densities(solution, ctsys, regionIntrinsic, iphin, iphip)
+
     # DEBUG: Find peak and minimum of Beer-Lambert generation in the absorber
-    subg = subgrid(grid, [2])
-    println("\nBEER-LAMBERT GENERATION PROFILE INFO")
-    println("PEAK: $(BeerLambert(ctsys, 2, subg[Coordinates])[1])")
-    println("MIN: $(BeerLambert(ctsys, 2, subg[Coordinates])[end])")
+    # subg = subgrid(grid, [2])
+    # println("\nBEER-LAMBERT GENERATION PROFILE INFO")
+    # println("PEAK: $(BeerLambert(ctsys, 2, subg[Coordinates])[1])")
+    # println("MIN: $(BeerLambert(ctsys, 2, subg[Coordinates])[end])")
 
     # Plot dark and illuminated short-circuit band energies and carrier densities
     if plotting
@@ -430,18 +451,8 @@ function main(;
             println("QFLS: $(QFLS)")
 
             # carrier densities at absorber edges 
-            e_dens = get_density(solution, regionIntrinsic, ctsys, iphin)
-            h_dens = get_density(solution, regionIntrinsic, ctsys, iphip)
+            carrier_densities(solution, ctsys, regionIntrinsic, iphin, iphip)
 
-            println("\nINTERFACE CARRIER DENSITIES")
-            println("PVK-ETL INTERFACE")
-            println("Electron Concentration: $(e_dens[1])")
-            println("Hole Concentration: $(h_dens[1])")
-            println("\nPVK-HTL INTERFACE")
-            println("Electron Concentration: $(e_dens[end])")
-            println("Hole Concentration: $(h_dens[end])")
-
-            
             Plotter.figure()
             plot_energies(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_energy)
             Plotter.figure()

@@ -81,11 +81,12 @@ r0 = [2.30e-18, 2.07e-16, 1.02e-18] .* cm^3 / s
 # EI = [-5.0, -4.6, -4.05] .* eV
 
 ## generation
-incidentPhotonFlux = [0.0, 4.3e21, 0.0] ./ (m^2 * s)
-absorption = [1.0e5, 1.0e7, 0.0] ./ m
-generationPeak = h_pdoping
+# incidentPhotonFlux = [0.0, 4.3e21, 0.0] ./ (m^2 * s)
+# absorption = [1.0e5, 1.0e7, 0.0] ./ m
+# generationPeak = h_pdoping
 
-generation_uniform = [0.0, 2.64e25, 0.0] ./ (m^3 * s)
+generation_uniform = [0, 2.04e27, 0] ./ (m^3 * s)
+# generation_uniform = [3.1e26, 2.04e27, 5.2e20] ./ (m^3 * s)
 
 ## doping
 TLdop = 1.0e11
