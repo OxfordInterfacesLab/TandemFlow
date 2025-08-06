@@ -85,8 +85,8 @@ r0 = [2.30e-18, 2.07e-16, 1.02e-18] .* cm^3 / s
 # absorption = [1.0e5, 1.0e7, 0.0] ./ m
 # generationPeak = h_pdoping
 
-generation_uniform = [0, 2.04e27, 0] ./ (m^3 * s)
-# generation_uniform = [3.1e26, 2.04e27, 5.2e20] ./ (m^3 * s)
+generation_uniform = [3.1e26, 2.04e27, 0] ./ (m^3 * s)
+# ISSUE: Uniform generation in HTL causes some kind of convergence error - consider grid refinement
 
 ## doping
 TLdop = 1.0e11

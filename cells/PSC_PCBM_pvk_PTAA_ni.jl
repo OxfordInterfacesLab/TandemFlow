@@ -85,7 +85,7 @@ function main(;
     end
     ################################################################################
 
-    ## I have used the same adaptive grid as in the PSC examples
+    ## TODO: Play around with the grid dimensions
     δ = 6 * n       
     t = 0.5 * (cm) / δ 
     k = 1.5  
