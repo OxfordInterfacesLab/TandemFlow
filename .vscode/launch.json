@@ -4,13 +4,9 @@
         {
             "type": "julia",
             "request": "launch",
-            "name": "Run Si_PERC.jl",
+            "name": "Debug Si_PERC",
             "program": "${workspaceFolder}/cells/Si_PERC.jl",
-            "cwd": "${workspaceFolder}",
-            "stopOnEntry": false,
-            "env": {
-                "MPLBACKEND": "qt5agg"
-            }
+            "juliaEnv": "."
         }
     ]
 }
