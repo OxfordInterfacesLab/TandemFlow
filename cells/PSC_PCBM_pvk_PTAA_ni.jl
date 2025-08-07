@@ -50,7 +50,7 @@ end
 function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
-        parameter_file = "params/Params_PSC_PCBM_pvk_PTAA.jl",
+        parameter_file = "../params/Params_PSC_PCBM_pvk_PTAA.jl",
     )
 
     if plotting
@@ -491,3 +491,6 @@ function main(;
     end
 
 end # main
+
+# DEBUG
+main()

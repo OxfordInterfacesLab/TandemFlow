@@ -1,8 +1,1 @@
-name = "TandemFlow"
-uuid = "81170067-c6e2-4b07-9f5c-8ca20747c956"
-version = "0.1.0"
-
 [deps]
-ExtendableGrids = "cfc395e8-590f-11e8-1f13-43a2532b2fa8"
-PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
-PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
