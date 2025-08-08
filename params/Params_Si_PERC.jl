@@ -60,11 +60,11 @@ r0 = [0.0, 0.0, 0.0] .* cm^3 / s  # Not provided, set to zero
 τn = [1.0e13, 1.0e-4, 1.0e-8] .* s  # a-Si (minority), Cz-Si, a-Si (minority)
 τp = [1.0e-8, 1.0e-4, 1.0e13] .* s  # a-Si (majority), Cz-Si, a-Si (majority)
 
-incidentPhotonFlux = [0.0, 4.30e20, 0.0] ./ (m^2 * s)
-absorption = [0.0, 1.0e7, 0.0] ./ m
-generationPeak = h_ndoping
+# incidentPhotonFlux = [0.0, 4.30e20, 0.0] ./ (m^2 * s)
+# absorption = [0.0, 1.0e7, 0.0] ./ m
+# generationPeak = h_ndoping
 
-# generation_uniform = [0.0, 2.64e25, 0.0] ./ (m^3 * s)
+generation_uniform = [2.50e18, 1.0e15, 1.08e14] ./ (m^3 * s)
 
 ## doping
 Cn = 1.0e22 / (m^3)

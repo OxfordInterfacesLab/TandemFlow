@@ -3,6 +3,8 @@ ENV["MPLBACKEND"] = "qt5agg"
 using ChargeTransport
 using ExtendableGrids
 using PyPlot
+using CSV
+using DataFrames
 
 # Plotting with scienceplots
 using PyCall
@@ -21,12 +23,41 @@ function middle_element(A)
     return A[idx]
 end
 
+# save profile as a CSV file
+function save_device_profile_csv(filename, solution, ctsys)
+    grid = ctsys.fvmsys.grid
+    data = ctsys.fvmsys.physics.data
+    params = data.params
+
+    x = zeros(0)
+    n = zeros(0)
+    p = zeros(0)
+
+    for ireg in 1:numberOfRegions
+        subg = subgrid(grid, [ireg])
+
+        append!(x, subg[Coordinates]')
+        
+        append!(n, get_density(solution, ireg, ctsys, iphin))
+        append!(p, get_density(solution, ireg, ctsys, iphip))
+    end
+
+    # Build DataFrame
+    df = DataFrame(
+        x = x,
+        n = n,
+        p = p
+    )
+
+    CSV.write(filename, df)
+end
+
 # you can also use other Plotters, if you add them to the example file
 function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
         #parameter_file = "../parameter_files/Params_PSC_TiO2_MAPI_spiro.jl", # choose the parameter file
-        parameter_file = "params/Params_Si_PERC.jl", # choose the parameter file
+        parameter_file = "../params/Params_Si_PERC.jl", # choose the parameter file
     )
 
     if plotting
@@ -121,13 +152,9 @@ function main(;
     ## Initialize Data instance and fill in data
     data = Data(grid, numberOfCarriers)
 
-    ## Possible choices: Stationary, Transient
     data.modelType = Transient
-
-    ## Possible choices: Boltzmann, FermiDiracOneHalfBednarczyk, FermiDiracOneHalfTeSCA,
-    ## FermiDiracMinusOne, Blakemore
     carrier_stats = Boltzmann
-    data.F = [carrier_stats, carrier_stats, FermiDiracMinusOne]
+    data.F = [carrier_stats, carrier_stats]
 
     data.bulkRecombination = set_bulk_recombination(;
         iphin = iphin, iphip = iphip,
@@ -138,17 +165,13 @@ function main(;
 
     # TODO: Would be better to setup user-defined model - uniform in TLs and then Beer-Lambert in absorber
 
-    data.generationModel = GenerationBeerLambert
+    data.generationModel = GenerationUniform
 
-    ## Possible choices: OhmicContact, SchottkyContact (outer boundary) and InterfaceNone,
-    ## InterfaceRecombination (inner boundary).
     data.boundaryType[bregionAcceptor] = OhmicContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
     data.boundaryType[bregionJ2] = InterfaceRecombination
     data.boundaryType[bregionDonor] = OhmicContact
 
-    ## Choose flux discretization scheme: ScharfetterGummel, ScharfetterGummelGraded,
-    ## ExcessChemicalPotential, ExcessChemicalPotentialGraded, DiffusionEnhanced, GeneralizedSG
     data.fluxApproximation .= ExcessChemicalPotential
 
     if test == false
@@ -187,21 +210,23 @@ function main(;
         params.recombinationSRHLifetime[iphin, ireg] = τn[ireg]
         params.recombinationSRHLifetime[iphip, ireg] = τp[ireg]
 
-        ## TODO: Trap densities
+        # ## TODO: Trap densities
 
-        if ireg == regionAcceptor || ireg == regionDonor
-            params.recombinationSRHTrapDensity[iphin, ireg] = 0.0 / (m^3)
-            params.recombinationSRHTrapDensity[iphip, ireg] = 0.0 / (m^3)
-        else
-            params.recombinationSRHTrapDensity[iphin, ireg] = 2.0e21 / (m^3)
-            params.recombinationSRHTrapDensity[iphip, ireg] = 2.0e21 / (m^3)
-        end
+        # if ireg == regionAcceptor || ireg == regionDonor
+        #     params.recombinationSRHTrapDensity[iphin, ireg] = 0.0 / (m^3)
+        #     params.recombinationSRHTrapDensity[iphip, ireg] = 0.0 / (m^3)
+        # else
+        #     params.recombinationSRHTrapDensity[iphin, ireg] = 2.0e21 / (m^3)
+        #     params.recombinationSRHTrapDensity[iphip, ireg] = 2.0e21 / (m^3)
+        # end
         
-        params.generationIncidentPhotonFlux[ireg] = incidentPhotonFlux[ireg]
-        params.generationAbsorption[ireg] = absorption[ireg]
+        # params.generationIncidentPhotonFlux[ireg] = incidentPhotonFlux[ireg]
+        # params.generationAbsorption[ireg] = absorption[ireg]
+
+        params.generationUniform[ireg] = generation_uniform[ireg]
     end
 
-    params.generationPeak = generationPeak
+    # params.generationPeak = generationPeak
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
@@ -219,21 +244,21 @@ function main(;
 
     # TODO: Recombination parameters for interfaces
 
-    min_SRV = 1.0e3 * cm/s
-    maj_SRV = 1.0e7 * cm/s
+    # min_SRV = 1.0e3 * cm/s
+    # maj_SRV = 1.0e7 * cm/s
 
-    ## for surface recombination
-    params.recombinationSRHvelocity[iphin, bregionJ1] = maj_SRV * 5.0
-    params.recombinationSRHvelocity[iphip, bregionJ1] = min_SRV * 5.0
+    # ## for surface recombination
+    # params.recombinationSRHvelocity[iphin, bregionJ1] = maj_SRV * 5.0
+    # params.recombinationSRHvelocity[iphip, bregionJ1] = min_SRV * 5.0
 
-    params.bRecombinationSRHTrapDensity[iphin, bregionJ1] = 2.0e18 / (m^3)
-    params.bRecombinationSRHTrapDensity[iphip, bregionJ1] = 2.0e18 / (m^3)
+    # params.bRecombinationSRHTrapDensity[iphin, bregionJ1] = 2.0e18 / (m^3)
+    # params.bRecombinationSRHTrapDensity[iphip, bregionJ1] = 2.0e18 / (m^3)
 
-    params.recombinationSRHvelocity[iphin, bregionJ2] = min_SRV
-    params.recombinationSRHvelocity[iphip, bregionJ2] = maj_SRV
+    # params.recombinationSRHvelocity[iphin, bregionJ2] = min_SRV
+    # params.recombinationSRHvelocity[iphip, bregionJ2] = maj_SRV
 
-    params.bRecombinationSRHTrapDensity[iphin, bregionJ2] = 1.0e17 / (m^3)
-    params.bRecombinationSRHTrapDensity[iphip, bregionJ2] = 1.0e17 / (m^3)
+    # params.bRecombinationSRHTrapDensity[iphin, bregionJ2] = 1.0e17 / (m^3)
+    # params.bRecombinationSRHTrapDensity[iphip, bregionJ2] = 1.0e17 / (m^3)
 
     ##############################################################
 
@@ -289,6 +314,13 @@ function main(;
         println("Plot electroneutral potential, band-edge energies and doping")
         ################################################################################
         label_solution, label_density, label_energy, label_BEE = set_plotting_labels(data)
+
+        # Plot dark equilibrium
+        # Plotter.figure()
+        # plot_energies(Plotter, ctsys, solution, "Equilibrium, Dark", label_energy)
+        # Plotter.figure()
+        # plot_densities(Plotter, ctsys, solution, "Equilibrium, Dark", label_density)
+        # Plotter.show()
     end
 
     ## DARK EQUILIBRIUM
@@ -304,7 +336,12 @@ function main(;
     #     Plotter.show()
     # end
 
+    # save_device_profile_csv("si_1_dark_sc.csv", solution, ctsys)
+    # exit()
+    
     solution_dark = solution
+
+    ### D: ILLUMINATION
 
     I = collect(20:-0.5:0.0)
     LAMBDA = 10 .^ (-I)
@@ -329,39 +366,17 @@ function main(;
 
     end # generation loop
 
-    # INFO: Beer-Lambert generation rate at either edge of absorber
-    # subg = subgrid(grid, [2])
-    # println(":")
-    # println("PEAK: $(BeerLambert(ctsys, 2, subg[Coordinates])[1])")
-    # println("MIN: $(BeerLambert(ctsys, 2, subg[Coordinates])[end])")
+    save_device_profile_csv("si_1_ill_sc.csv", solution, ctsys)
+    exit()
 
-    # Plot dark and illuminated short-circuit band energies and carrier densities
-    # if plotting
-    #     PyPlot.rc("figure", figsize=(10, 10))
-    #     fig = Plotter.figure()
-
-    #     # 2×2 grid, slot 1
-    #     Plotter.subplot(2, 2, 1)
-    #     plot_energies(Plotter, ctsys, solution_dark, "Equilibrium, Dark", label_energy, clear = false)
-
-    #     # slot 2
-    #     Plotter.subplot(2, 2, 2)
-    #     plot_densities(Plotter, ctsys, solution_dark, "Equilibrium, Dark", label_density, clear = false)
-
-    #     # slot 3
-    #     Plotter.subplot(2, 2, 3)
-    #     plot_energies(Plotter, ctsys, solution, "Equilibrium, Illuminated", label_energy, clear = false)
-
-    #     # slot 4
-    #     Plotter.subplot(2, 2, 4)
-    #     plot_densities(Plotter, ctsys, solution, "Equilibrium, Illuminated", label_density, clear = false)
-
-    #     # clean up
-    #     fig.tight_layout()
-    #     Plotter.show()
-
-    #     PyPlot.rc("figure", figsize=(8, 8))
-    # end
+    # Plot illuminated short-circuit
+    if plotting
+        Plotter.figure()
+        plot_energies(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_energy)
+        Plotter.figure()
+        plot_densities(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_density)
+        Plotter.show()
+    end
 
     if test == false
         println("*** done\n")
@@ -466,4 +481,7 @@ function main(;
     testval = sum(filter(!isnan, solution)) / length(solution) # when using sparse storage, we get NaN values in solution
     return testval
 
-end # main
+end
+
+# DEBUG
+main()
