@@ -59,10 +59,8 @@ r0 = [0.0, 0.0] .* cm^3 / s  # Not provided, set to zero
 generation_uniform = [2.50e18, 1.0e15] ./ (m^3 * s)
 
 ## doping
-Cn = 1.0e22 / (m^3)
-Cp = 1.0e23 / (m^3)
-
-# effective intrinsic carrier density
-# Ci_eff = 1.0e22 / (m^3)
+Cem = 1.0e24 / (m^3)
+Ccz = 1.0e21 / (m^3)
+Cpoly = 1.0e26 / (m^3)
 
 UT = kB * T / q

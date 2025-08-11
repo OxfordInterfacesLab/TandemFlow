@@ -118,6 +118,8 @@ function main(;
     coord = glue(coord, coord_p_u, tol = 10 * t)
     grid = ExtendableGrids.simplexgrid(coord)
 
+    numberOfNodes = length(coord)
+
     ## set different regions in grid
     cellmask!(grid, [0.0], [heightLayers[1]], regionCz, tol = 1.0e-18) # intrinsic region = 2
     cellmask!(grid, [heightLayers[1]], [heightLayers[2]], regionPoly, tol = 1.0e-18)  # p-doped region   = 3
@@ -177,6 +179,7 @@ function main(;
     ################################################################################
 
     params = Params(grid, numberOfCarriers)
+    paramsnodal = ParamsNodal(grid, numberOfCarriers)
 
     params.temperature = T
     params.UT = (kB * params.temperature) / q
@@ -249,10 +252,24 @@ function main(;
     ##############################################################
 
     ## interior doping
-    params.doping[iphip, regionCz] = Cn
-    params.doping[iphin, regionPoly] = Cp
+    # params.doping[iphip, regionCz] = Cn
+    # params.doping[iphin, regionPoly] = Cp
+
+    # println("DEBUG\nSUM: $(sum(numberOfNodes))")
+    # println("LENGTH: $(length(coord)))\n")
+
+    ## Positive doping corresponds to acceptors
+    for icoord in 1:numberOfNodes
+        if icoord <= (length(coord_n_u) + length(coord_n_g) - 1) # n C-Si region
+            paramsnodal.doping[icoord] = Cem
+        else
+            paramsnodal.doping[icoord] = -Cpoly
+        end
+    end
 
     data.params = params
+    data.paramsnodal = paramsnodal
+
     ctsys = System(grid, data, unknown_storage = :sparse)
 
     if test == false
@@ -304,17 +321,6 @@ function main(;
     println("Built-in Voltage: $(Vbi)V")
 
     exit()
-
-    # Plot equilibrium voltage profile
-    # if plotting
-    #     Plotter.figure()
-    #     plot_solution(Plotter, ctsys, solution, "Equilibrium, Dark", label_solution)
-
-    #     Plotter.show()
-    # end
-
-    # save_device_profile_csv("si_1_dark_sc.csv", solution, ctsys)
-    # exit()
     
     solution_dark = solution
 
