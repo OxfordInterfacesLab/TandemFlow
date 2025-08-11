@@ -18,6 +18,7 @@ bregionPoly = 2
 bregionJ1 = 3
 
 ## length domains
+h_emitter = 2.3 * μm
 h_cz = 100.0 * μm
 h_poly = 60.0 * nm
 h_total = h_cz + h_poly
@@ -53,10 +54,14 @@ Np = [1.04e25, 1.0e26] ./ (m^3)
 r0 = [0.0, 0.0] .* cm^3 / s  # Not provided, set to zero
 
 ## life times and trap densities
-τn = [1.0e-8, 1.0e13] .* s  # a-Si (minority), Cz-Si, a-Si (minority)
-τp = [1.0e13, 1.0e-8] .* s  # a-Si (majority), Cz-Si, a-Si (majority)
+τn = [1.0, 1.0] .* s  # a-Si (minority), Cz-Si, a-Si (minority)
+τp = [1.0, 1.0] .* s  # a-Si (majority), Cz-Si, a-Si (majority)
 
-generation_uniform = [2.50e18, 1.0e15] ./ (m^3 * s)
+## generation data
+# generation_uniform = [1.0e24, 0.0] ./ (m^3 * s)
+# incidentPhotonFlux = [4.3e21, 0.0] ./ (m^2 * s)
+# absorption = [1.61e6, 0.0] ./ m
+# generationPeak = 0.0
 
 ## doping
 Cem = 1.0e24 / (m^3)

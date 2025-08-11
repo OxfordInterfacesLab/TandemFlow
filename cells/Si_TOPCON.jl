@@ -23,6 +23,30 @@ function middle_element(A)
     return A[idx]
 end
 
+#=
+tanh-like drop from `ymax` to `ymin` between x0..x1, then stays at `ymin`.
+
+Arguments:
+- x0: start of transition
+- x1: end of transition
+- ymin, ymax: target bounds
+- sharpness: larger => steeper transition
+=#
+function tanh_plateau(x; x0=0.0, x1=10.0, ymin=0.0, ymax=1.0, sharpness=8.0)
+    x1 <= x0 && throw(ArgumentError("require x1 > x0"))
+    if x <= x0
+        return ymax
+    elseif x >= x1
+        return ymin
+    else
+        k   = sharpness / (x1 - x0)
+        mid = (x0 + x1)/2
+        # tanh gives ~+1 near x0 and ~-1 near x1
+        t = (tanh(k*(mid - x)) + 1) / 2   # maps [-1,1] -> [0,1]
+        return ymin + (ymax - ymin) * t
+    end
+end
+
 # save profile as a CSV file
 function save_device_profile_csv(filename, solution, ctsys)
     grid = ctsys.fvmsys.grid
@@ -100,22 +124,24 @@ function main(;
     t = 0.5 * (cm) / δ # tolerance for geomspace and glue (with factor 10)
     k = 1.5        # the closer to 1, the closer to the boundary geomspace
 
-    coord_n_u = collect(range(0.0, h_cz / 2, step = h_cz / (0.8 * δ)))
-    coord_n_g = geomspace(
-        h_cz / 2, h_cz,
-        h_cz / (0.7 * δ), h_cz / (1.1 * δ),
+    coord_em = collect(range(0.0, h_emitter, step = h_emitter / (0.8 * δ)))
+    coord_cz_u = collect(range(h_emitter, 0.9 * h_cz, step = h_cz / (0.8 * δ)))
+    coord_cz_g = geomspace(
+        0.9 * h_cz, h_cz,
+        (0.1 * h_cz) / (0.7 * δ), (0.1 * h_cz) / (1.1 * δ),
         tol = t
     )
-    coord_p_g = geomspace(
+    coord_poly_g = geomspace(
         h_cz, h_cz + h_poly / 2,
         h_poly / (1.3 * δ), h_poly / (0.6 * δ),
         tol = t
     )
-    coord_p_u = collect(range(h_cz + h_poly / 2, h_cz + h_poly, step = h_poly / (0.8 * δ)))
+    coord_poly_u = collect(range(h_cz + h_poly / 2, h_cz + h_poly, step = h_poly / (0.8 * δ)))
 
-    coord = glue(coord_n_u, coord_n_g, tol = 10 * t)
-    coord = glue(coord, coord_p_g, tol = 10 * t)
-    coord = glue(coord, coord_p_u, tol = 10 * t)
+    coord = glue(coord_em, coord_cz_u, tol = 10 * t)
+    coord = glue(coord, coord_cz_g, tol = 10 * t)
+    coord = glue(coord, coord_poly_g, tol = 10 * t)
+    coord = glue(coord, coord_poly_u, tol = 10 * t)
     grid = ExtendableGrids.simplexgrid(coord)
 
     numberOfNodes = length(coord)
@@ -130,11 +156,11 @@ function main(;
     bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # first  inner interface
 
     ## Plot node grid
-    if plotting
-        gridplot(grid, Plotter = Plotter, legend = :lt)
-        Plotter.title("Grid")
-        Plotter.show()
-    end
+    # if plotting
+    #     gridplot(grid, Plotter = Plotter, legend = :lt)
+    #     Plotter.title("Grid")
+    #     Plotter.show()
+    # end
 
     if test == false
         println("*** done\n")
@@ -146,8 +172,20 @@ function main(;
     end
     ################################################################################
 
+    ## set up generation data
+    subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
+
+    gen1 = zeros(length(subg1[Coordinates])); gen2 = zeros(length(subg2[Coordinates]) - 1)
+    decay(x) = 6.82e21 * exp(-8.408e4 * x)
+
+    for i in 1:length(subg1[Coordinates])
+        gen1[i] = decay(subg1[Coordinates][i])
+    end
+
+    generationData = [gen1; gen2]
+
     ## Initialize Data instance and fill in data
-    data = Data(grid, numberOfCarriers)
+    data = Data(grid, numberOfCarriers, generationData = generationData)
 
     data.modelType = Transient
     carrier_stats = Boltzmann
@@ -160,7 +198,7 @@ function main(;
         bulk_recomb_SRH = true
     )
 
-    data.generationModel = GenerationUniform
+    data.generationModel = GenerationUserDefined
 
     data.boundaryType[bregionPoly] = OhmicContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
@@ -214,14 +252,7 @@ function main(;
         #     params.recombinationSRHTrapDensity[iphin, ireg] = 2.0e21 / (m^3)
         #     params.recombinationSRHTrapDensity[iphip, ireg] = 2.0e21 / (m^3)
         # end
-        
-        # params.generationIncidentPhotonFlux[ireg] = incidentPhotonFlux[ireg]
-        # params.generationAbsorption[ireg] = absorption[ireg]
-
-        params.generationUniform[ireg] = generation_uniform[ireg]
     end
-
-    # params.generationPeak = generationPeak
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
@@ -260,8 +291,14 @@ function main(;
 
     ## Positive doping corresponds to acceptors
     for icoord in 1:numberOfNodes
-        if icoord <= (length(coord_n_u) + length(coord_n_g) - 1) # n C-Si region
-            paramsnodal.doping[icoord] = Cem
+        if icoord <= (length(coord_em) + length(coord_cz_u) + length(coord_cz_g) - 2) # n C-Si region
+            paramsnodal.doping[icoord] = tanh_plateau(coord[icoord]; 
+                x0 = 0.0,
+                x1 = 2.3 * μm,
+                ymin = -Ccz,
+                ymax = Cem,
+                sharpness = 6.0
+            )
         else
             paramsnodal.doping[icoord] = -Cpoly
         end
@@ -320,20 +357,10 @@ function main(;
     Vbi = solution[ipsi, end] - solution[ipsi, 1]
     println("Built-in Voltage: $(Vbi)V")
 
-    exit()
-    
-    solution_dark = solution
-
     ### D: ILLUMINATION
 
     I = collect(20:-0.5:0.0)
     LAMBDA = 10 .^ (-I)
-
-    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionDonor] = 0
-    # ctsys.fvmsys.boundary_values[data.index_psi, bregionDonor] = 0
-
-    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionPoly] = 0
-    # ctsys.fvmsys.boundary_values[data.index_psi, bregionPoly] = 0
 
     for istep in 1:(length(I) - 1)
 
@@ -349,9 +376,9 @@ function main(;
 
     end # generation loop
 
-    save_device_profile_csv("si_1_ill_sc.csv", solution, ctsys)
-    exit()
+    
 
+    # save_device_profile_csv("si_1_ill_sc.csv", solution, ctsys)
     # Plot illuminated short-circuit
     if plotting
         Plotter.figure()
@@ -360,6 +387,11 @@ function main(;
         plot_densities(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_density)
         Plotter.show()
     end
+    
+    println("DEBUG/BL-MIN: $(data.generationData[length(gen1)])")
+    Plotter.figure()
+    Plotter.plot(coord, data.generationData)
+    Plotter.show()
 
     if test == false
         println("*** done\n")
@@ -371,7 +403,7 @@ function main(;
     end
     ################################################################################
 
-    Isc = -get_current_val(ctsys, solution)
+    Isc = get_current_val(ctsys, solution)
 
     ## for saving I-V data
     IV = zeros(0) # for IV values
@@ -385,7 +417,7 @@ function main(;
         Δt = t - tvalues[istep - 1] # Time step size
 
         ## Apply new voltage (set non-equilibrium values)
-        set_contact!(ctsys, bregionPoly, Δu = Δu)
+        set_contact!(ctsys, bregionCz, Δu = Δu)
 
         if test == false
             println("time value: Δt = $(t)")
@@ -400,47 +432,52 @@ function main(;
         push!(IV, current)
         push!(biasValues, Δu)
 
-        if isapprox(current, 0, atol = 10) && current > 0 && tested == false && plotting
-            println("CURRENT: $(current)")
-            # determine QFLS near Voc
-            subg = subgrid(grid, [regionCz])
-            EFn = view(solution[iphin, :], subg)
-            EFp = view(solution[iphip, :], subg)
+        # if isapprox(current, 0, atol = 10) && current > 0 && tested == false && plotting
+        #     println("CURRENT: $(current)")
+        #     # determine QFLS near Voc
+        #     subg = subgrid(grid, [regionCz])
+        #     EFn = view(solution[iphin, :], subg)
+        #     EFp = view(solution[iphip, :], subg)
 
-            QFLS = abs(minimum(EFn) - maximum(EFp))
+        #     QFLS = abs(minimum(EFn) - maximum(EFp))
 
-            # println("EF_n: $(EFn)")
-            # println("EF_p: $(EFp)")
-            println("QFLS: $(QFLS)")
+        #     # println("EF_n: $(EFn)")
+        #     # println("EF_p: $(EFp)")
+        #     println("QFLS: $(QFLS)")
 
-            # carrier densities at absorber edges 
-            e_dens = get_density(solution, regionCz, ctsys, iphin)
-            h_dens = get_density(solution, regionCz, ctsys, iphip)
+        #     # carrier densities at absorber edges 
+        #     e_dens = get_density(solution, regionCz, ctsys, iphin)
+        #     h_dens = get_density(solution, regionCz, ctsys, iphip)
 
-            println("\n")
-            println("PVK-ETL INTERFACE")
-            println("Electron Concentration: $(e_dens[1])")
-            println("Hole Concentration: $(h_dens[1])")
-            println("\n")
-            println("PVK-HTL INTERFACE")
-            println("Electron Concentration: $(e_dens[end])")
-            println("Hole Concentration: $(h_dens[end])")
+        #     println("\n")
+        #     println("PVK-ETL INTERFACE")
+        #     println("Electron Concentration: $(e_dens[1])")
+        #     println("Hole Concentration: $(h_dens[1])")
+        #     println("\n")
+        #     println("PVK-HTL INTERFACE")
+        #     println("Electron Concentration: $(e_dens[end])")
+        #     println("Hole Concentration: $(h_dens[end])")
 
-            Plotter.figure()
-            plot_energies(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_energy)
-            Plotter.figure()
-            plot_densities(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_density)
-            # Plotter.ylim(1e7, 1e19)            
-            show()
-            tested = true
-        end
+        #     Plotter.figure()
+        #     plot_energies(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_energy)
+        #     Plotter.figure()
+        #     plot_densities(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_density)           
+        #     show()
+        #     tested = true
+        # end
 
     end # time loop
 
-    plot_IV(Plotter, biasValues, IV, "bias \$\\Delta u\$ = $(vend)")
+    plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(vend)")
     show()
 
-    IV = -IV
+    IV = IV
+
+    ## DEBUG
+    target = 0.7244
+    idx = findmin(abs.(biasValues .- target))[2]
+    value_at_idx = IV[idx]
+    println("Index: ", idx, ", biasValue: ", biasValues[idx], ", IV: ", value_at_idx)
 
     powerDensity = biasValues .* (IV)           # power density function
     MaxPD, indexPD = findmax(powerDensity)
