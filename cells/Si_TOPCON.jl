@@ -57,7 +57,7 @@ function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
         #parameter_file = "../parameter_files/Params_PSC_TiO2_MAPI_spiro.jl", # choose the parameter file
-        parameter_file = "../params/Params_Si_PERC.jl", # choose the parameter file
+        parameter_file = "../params/Params_Si_TOPCON.jl", # choose the parameter file
     )
 
     if plotting
@@ -94,50 +94,45 @@ function main(;
     end
     ################################################################################
 
+    # TODO: Need density increase around interface
+
     δ = 6 * n        # the larger, the finer the mesh
     t = 0.5 * (cm) / δ # tolerance for geomspace and glue (with factor 10)
     k = 1.5        # the closer to 1, the closer to the boundary geomspace
 
-    coord_n_u = collect(range(0.0, h_ndoping / 2, step = h_ndoping / (0.8 * δ)))
+    coord_n_u = collect(range(0.0, h_cz / 2, step = h_cz / (0.8 * δ)))
     coord_n_g = geomspace(
-        h_ndoping / 2, h_ndoping,
-        h_ndoping / (0.7 * δ), h_ndoping / (1.1 * δ),
-        tol = t
-    )
-    coord_a_g1 = geomspace(
-        h_ndoping, h_ndoping + h_absorber / k,
-        h_absorber / (5.1 * δ), h_absorber / (1.1 * δ),
-        tol = t
-    )
-    coord_a_g2 = geomspace(
-        h_ndoping + h_absorber / k, h_ndoping + h_absorber,
-        h_absorber / (1.1 * δ), h_absorber / (5.1 * δ),
+        h_cz / 2, h_cz,
+        h_cz / (0.7 * δ), h_cz / (1.1 * δ),
         tol = t
     )
     coord_p_g = geomspace(
-        h_ndoping + h_absorber, h_ndoping + h_absorber + h_pdoping / 2,
-        h_pdoping / (1.3 * δ), h_pdoping / (0.6 * δ),
+        h_cz, h_cz + h_poly / 2,
+        h_poly / (1.3 * δ), h_poly / (0.6 * δ),
         tol = t
     )
-    coord_p_u = collect(range(h_ndoping + h_absorber + h_pdoping / 2, h_ndoping + h_absorber + h_pdoping, step = h_pdoping / (0.8 * δ)))
+    coord_p_u = collect(range(h_cz + h_poly / 2, h_cz + h_poly, step = h_poly / (0.8 * δ)))
 
     coord = glue(coord_n_u, coord_n_g, tol = 10 * t)
-    coord = glue(coord, coord_a_g1, tol = 10 * t)
-    coord = glue(coord, coord_a_g2, tol = 10 * t)
     coord = glue(coord, coord_p_g, tol = 10 * t)
     coord = glue(coord, coord_p_u, tol = 10 * t)
     grid = ExtendableGrids.simplexgrid(coord)
 
     ## set different regions in grid
-    cellmask!(grid, [0.0 * μm], [heightLayers[1]], regionDonor, tol = 1.0e-18)     # n-doped region   = 1
-    cellmask!(grid, [heightLayers[1]], [heightLayers[2]], regionIntrinsic, tol = 1.0e-18) # intrinsic region = 2
-    cellmask!(grid, [heightLayers[2]], [heightLayers[3]], regionAcceptor, tol = 1.0e-18)  # p-doped region   = 3
+    cellmask!(grid, [0.0], [heightLayers[1]], regionCz, tol = 1.0e-18) # intrinsic region = 2
+    cellmask!(grid, [heightLayers[1]], [heightLayers[2]], regionPoly, tol = 1.0e-18)  # p-doped region   = 3
 
     ## bfacemask! for setting different boundary regions
-    bfacemask!(grid, [0.0], [0.0], bregionDonor, tol = 1.0e-18)     # outer left boundary
-    bfacemask!(grid, [h_total], [h_total], bregionAcceptor, tol = 1.0e-18)  # outer right boundary
+    bfacemask!(grid, [0.0], [0.0], bregionCz, tol = 1.0e-18)     # outer left boundary
+    bfacemask!(grid, [h_total], [h_total], bregionPoly, tol = 1.0e-18)  # outer right boundary
     bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # first  inner interface
-    bfacemask!(grid, [heightLayers[2]], [heightLayers[2]], bregionJ2, tol = 1.0e-18) # second inner interface
+
+    ## Plot node grid
+    if plotting
+        gridplot(grid, Plotter = Plotter, legend = :lt)
+        Plotter.title("Grid")
+        Plotter.show()
+    end
 
     if test == false
         println("*** done\n")
@@ -163,14 +158,11 @@ function main(;
         bulk_recomb_SRH = true
     )
 
-    # TODO: Would be better to setup user-defined model - uniform in TLs and then Beer-Lambert in absorber
-
     data.generationModel = GenerationUniform
 
-    data.boundaryType[bregionAcceptor] = OhmicContact
+    data.boundaryType[bregionPoly] = OhmicContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
-    data.boundaryType[bregionJ2] = InterfaceRecombination
-    data.boundaryType[bregionDonor] = OhmicContact
+    data.boundaryType[bregionCz] = OhmicContact
 
     data.fluxApproximation .= ExcessChemicalPotential
 
@@ -212,7 +204,7 @@ function main(;
 
         # ## TODO: Trap densities
 
-        # if ireg == regionAcceptor || ireg == regionDonor
+        # if ireg == regionPoly || ireg == regionDonor
         #     params.recombinationSRHTrapDensity[iphin, ireg] = 0.0 / (m^3)
         #     params.recombinationSRHTrapDensity[iphip, ireg] = 0.0 / (m^3)
         # else
@@ -230,17 +222,11 @@ function main(;
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
-    params.bDensityOfStates[iphin, bregionJ1] = Nn[regionIntrinsic]
-    params.bDensityOfStates[iphip, bregionJ1] = Np[regionIntrinsic]
+    params.bDensityOfStates[iphin, bregionJ1] = Nn[regionCz]
+    params.bDensityOfStates[iphip, bregionJ1] = Np[regionCz]
 
-    params.bDensityOfStates[iphin, bregionJ2] = Nn[regionIntrinsic]
-    params.bDensityOfStates[iphip, bregionJ2] = Np[regionIntrinsic]
-
-    params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionIntrinsic]
-    params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionIntrinsic]
-
-    params.bBandEdgeEnergy[iphin, bregionJ2] = En[regionIntrinsic]
-    params.bBandEdgeEnergy[iphip, bregionJ2] = Ep[regionIntrinsic]
+    params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionCz]
+    params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionCz]
 
     # TODO: Recombination parameters for interfaces
 
@@ -263,11 +249,8 @@ function main(;
     ##############################################################
 
     ## interior doping
-    params.doping[iphin, regionDonor] = Cn
-    params.doping[iphip, regionAcceptor] = Cp
-
-    # absorber doping
-    params.doping[iphin, regionIntrinsic] = Ci_eff
+    params.doping[iphip, regionCz] = Cn
+    params.doping[iphin, regionPoly] = Cp
 
     data.params = params
     ctsys = System(grid, data, unknown_storage = :sparse)
@@ -343,8 +326,8 @@ function main(;
     # ctsys.fvmsys.boundary_factors[data.index_psi, bregionDonor] = 0
     # ctsys.fvmsys.boundary_values[data.index_psi, bregionDonor] = 0
 
-    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionAcceptor] = 0
-    # ctsys.fvmsys.boundary_values[data.index_psi, bregionAcceptor] = 0
+    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionPoly] = 0
+    # ctsys.fvmsys.boundary_values[data.index_psi, bregionPoly] = 0
 
     for istep in 1:(length(I) - 1)
 
@@ -396,7 +379,7 @@ function main(;
         Δt = t - tvalues[istep - 1] # Time step size
 
         ## Apply new voltage (set non-equilibrium values)
-        set_contact!(ctsys, bregionAcceptor, Δu = Δu)
+        set_contact!(ctsys, bregionPoly, Δu = Δu)
 
         if test == false
             println("time value: Δt = $(t)")
@@ -414,7 +397,7 @@ function main(;
         if isapprox(current, 0, atol = 10) && current > 0 && tested == false && plotting
             println("CURRENT: $(current)")
             # determine QFLS near Voc
-            subg = subgrid(grid, [regionIntrinsic])
+            subg = subgrid(grid, [regionCz])
             EFn = view(solution[iphin, :], subg)
             EFp = view(solution[iphip, :], subg)
 
@@ -425,8 +408,8 @@ function main(;
             println("QFLS: $(QFLS)")
 
             # carrier densities at absorber edges 
-            e_dens = get_density(solution, regionIntrinsic, ctsys, iphin)
-            h_dens = get_density(solution, regionIntrinsic, ctsys, iphip)
+            e_dens = get_density(solution, regionCz, ctsys, iphin)
+            h_dens = get_density(solution, regionCz, ctsys, iphip)
 
             println("\n")
             println("PVK-ETL INTERFACE")
@@ -478,4 +461,4 @@ function main(;
 end
 
 # DEBUG
-main()
+main(n = 12)
