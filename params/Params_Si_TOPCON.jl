@@ -18,7 +18,7 @@ bregionPoly = 2
 bregionJ1 = 3
 
 ## length domains
-h_emitter = 2.3 * μm
+h_emitter = 1.0 * μm
 h_cz = 100.0 * μm
 h_poly = 60.0 * nm
 h_total = h_cz + h_poly
@@ -64,8 +64,8 @@ r0 = [0.0, 0.0] .* cm^3 / s  # Not provided, set to zero
 # generationPeak = 0.0
 
 ## doping
-Cem = 1.0e24 / (m^3)
-Ccz = 1.0e21 / (m^3)
-Cpoly = 1.0e26 / (m^3)
+Cem = 6.0e24 / (m^3)
+Ccz = 3.0e21 / (m^3)
+Cpoly = 2.0e26 / (m^3)
 
 UT = kB * T / q

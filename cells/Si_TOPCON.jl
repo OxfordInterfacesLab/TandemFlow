@@ -56,21 +56,38 @@ function save_device_profile_csv(filename, solution, ctsys)
     x = zeros(0)
     n = zeros(0)
     p = zeros(0)
+    Ec = zeros(0)
+    Ev = zeros(0)
+    EFn = zeros(0)
+    EFp = zeros(0)
 
     for ireg in 1:numberOfRegions
         subg = subgrid(grid, [ireg])
 
+        Ec0 = get_BEE(iphip, ireg, ctsys)
+        Ev0 = get_BEE(iphin, ireg, ctsys)
+        solpsi = view(solution[data.index_psi, :], subg)
+        solp = view(solution[iphip, :], subg)
+        soln = view(solution[iphin, :], subg)
+
         append!(x, subg[Coordinates]')
-        
         append!(n, get_density(solution, ireg, ctsys, iphin))
         append!(p, get_density(solution, ireg, ctsys, iphip))
+        append!(Ec, Ec0 ./ q .- solpsi)
+        append!(Ev, Ev0 ./ q .- solpsi)
+        append!(EFn, -soln)
+        append!(EFp, -solp)
     end
 
     # Build DataFrame
     df = DataFrame(
         x = x,
         n = n,
-        p = p
+        p = p,
+        Ec = Ec,
+        Ev = Ev,
+        EFn = EFn,
+        EFp = EFp
     )
 
     CSV.write(filename, df)
@@ -124,11 +141,11 @@ function main(;
     t = 0.5 * (cm) / δ # tolerance for geomspace and glue (with factor 10)
     k = 1.5        # the closer to 1, the closer to the boundary geomspace
 
-    coord_em = collect(range(0.0, h_emitter, step = h_emitter / (0.8 * δ)))
-    coord_cz_u = collect(range(h_emitter, 0.9 * h_cz, step = h_cz / (0.8 * δ)))
+    coord_em = collect(range(0.0, 3*h_emitter, step = h_emitter / (0.8 * δ)))
+    coord_cz_u = collect(range(3*h_emitter, 0.95 * h_cz, step = h_cz / (0.8 * δ)))
     coord_cz_g = geomspace(
-        0.9 * h_cz, h_cz,
-        (0.1 * h_cz) / (0.7 * δ), (0.1 * h_cz) / (1.1 * δ),
+        0.95 * h_cz, h_cz,
+        (0.05 * h_cz) / (0.7 * δ), (0.05 * h_cz) / (1.1 * δ),
         tol = t
     )
     coord_poly_g = geomspace(
@@ -294,7 +311,7 @@ function main(;
         if icoord <= (length(coord_em) + length(coord_cz_u) + length(coord_cz_g) - 2) # n C-Si region
             paramsnodal.doping[icoord] = tanh_plateau(coord[icoord]; 
                 x0 = 0.0,
-                x1 = 2.3 * μm,
+                x1 = h_emitter,
                 ymin = -Ccz,
                 ymax = Cem,
                 sharpness = 6.0
@@ -321,7 +338,7 @@ function main(;
     control = SolverControl()
     control.verbose = verbose
     control.maxiters = 1000
-    control.damp_initial = 0.9
+    control.damp_initial = 0.6
     control.damp_growth = 1.61 # >= 1
     control.max_round = 5
 
@@ -356,6 +373,9 @@ function main(;
     ipsi = ctsys.fvmsys.physics.data.index_psi
     Vbi = solution[ipsi, end] - solution[ipsi, 1]
     println("Built-in Voltage: $(Vbi)V")
+
+    save_device_profile_csv("si-topcon-dark.csv", solution, ctsys)
+    exit()
 
     ### D: ILLUMINATION
 
@@ -432,39 +452,6 @@ function main(;
         push!(IV, current)
         push!(biasValues, Δu)
 
-        # if isapprox(current, 0, atol = 10) && current > 0 && tested == false && plotting
-        #     println("CURRENT: $(current)")
-        #     # determine QFLS near Voc
-        #     subg = subgrid(grid, [regionCz])
-        #     EFn = view(solution[iphin, :], subg)
-        #     EFp = view(solution[iphip, :], subg)
-
-        #     QFLS = abs(minimum(EFn) - maximum(EFp))
-
-        #     # println("EF_n: $(EFn)")
-        #     # println("EF_p: $(EFp)")
-        #     println("QFLS: $(QFLS)")
-
-        #     # carrier densities at absorber edges 
-        #     e_dens = get_density(solution, regionCz, ctsys, iphin)
-        #     h_dens = get_density(solution, regionCz, ctsys, iphip)
-
-        #     println("\n")
-        #     println("PVK-ETL INTERFACE")
-        #     println("Electron Concentration: $(e_dens[1])")
-        #     println("Hole Concentration: $(h_dens[1])")
-        #     println("\n")
-        #     println("PVK-HTL INTERFACE")
-        #     println("Electron Concentration: $(e_dens[end])")
-        #     println("Hole Concentration: $(h_dens[end])")
-
-        #     Plotter.figure()
-        #     plot_energies(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_energy)
-        #     Plotter.figure()
-        #     plot_densities(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_density)           
-        #     show()
-        #     tested = true
-        # end
 
     end # time loop
 
@@ -504,4 +491,4 @@ function main(;
 end
 
 # DEBUG
-main(n = 12)
+main(n = 12, verbose = true)
