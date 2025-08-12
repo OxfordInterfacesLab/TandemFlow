@@ -2,7 +2,7 @@ using DataFrames
 using CSV
 using PyPlot
 
-struct DeviceInfo
+struct CellInfo
     x::Float64
     n::Float64
     p::Float64
