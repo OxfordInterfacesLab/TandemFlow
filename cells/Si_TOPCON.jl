@@ -216,9 +216,9 @@ function main(;
 
     data.generationModel = GenerationUserDefined
 
-    data.boundaryType[bregionPoly] = OhmicContact
+    data.boundaryType[bregionPoly] = SchottkyContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
-    data.boundaryType[bregionCz] = OhmicContact
+    data.boundaryType[bregionCz] = SchottkyContact
 
     data.fluxApproximation .= ExcessChemicalPotential
 
@@ -271,25 +271,11 @@ function main(;
     params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionCz]
     params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionCz]
 
-    # TODO: Recombination parameters for interfaces
+    params.bVelocity[iphin, bregionCz] = 1.0e-2 * cm/s
+    params.bVelocity[iphip, bregionCz] = 1.0e7 * cm/s
 
-    # min_SRV = 1.0e3 * cm/s
-    # maj_SRV = 1.0e7 * cm/s
-
-    # ## for surface recombination
-    # params.recombinationSRHvelocity[iphin, bregionJ1] = maj_SRV * 5.0
-    # params.recombinationSRHvelocity[iphip, bregionJ1] = min_SRV * 5.0
-
-    # params.bRecombinationSRHTrapDensity[iphin, bregionJ1] = 2.0e18 / (m^3)
-    # params.bRecombinationSRHTrapDensity[iphip, bregionJ1] = 2.0e18 / (m^3)
-
-    # params.recombinationSRHvelocity[iphin, bregionJ2] = min_SRV
-    # params.recombinationSRHvelocity[iphip, bregionJ2] = maj_SRV
-
-    # params.bRecombinationSRHTrapDensity[iphin, bregionJ2] = 1.0e17 / (m^3)
-    # params.bRecombinationSRHTrapDensity[iphip, bregionJ2] = 1.0e17 / (m^3)
-
-    ##############################################################
+    params.bVelocity[iphin, bregionPoly] = 1.0e7 * cm/s
+    params.bVelocity[iphip, bregionPoly] = 1.0e-2 * cm/s
 
     ## Positive doping corresponds to acceptors
     for icoord in 1:numberOfNodes
@@ -325,7 +311,7 @@ function main(;
     control.maxiters = 1000
     control.damp_initial = 0.6
     control.damp_growth = 1.61 # >= 1
-    control.max_round = 5
+    # control.max_round = 5
 
     if test == false
         println("*** done\n")
@@ -339,6 +325,9 @@ function main(;
 
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
+
+    save_device_profile_csv("simulation_data/chargetransport/si-topcon-dark.csv", solution, ctsys)
+    exit()
 
     if plotting == true
         ################################################################################
