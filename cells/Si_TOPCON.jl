@@ -51,7 +51,6 @@ end
 function save_device_profile_csv(filename, solution, ctsys)
     grid = ctsys.fvmsys.grid
     data = ctsys.fvmsys.physics.data
-    params = data.params
 
     x = zeros(0)
     n = zeros(0)
@@ -173,13 +172,11 @@ function main(;
     bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # first  inner interface
 
     ## Plot node grid
-    if plotting
-        gridplot(grid, Plotter = Plotter, legend = :lt)
-        Plotter.title("Grid")
-        Plotter.show()
-    end
-
-    exit()
+    # if plotting
+    #     gridplot(grid, Plotter = Plotter, legend = :lt)
+    #     Plotter.title("Grid")
+    #     Plotter.show()
+    # end
 
     if test == false
         println("*** done\n")
@@ -195,7 +192,7 @@ function main(;
     subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
 
     gen1 = zeros(length(subg1[Coordinates])); gen2 = zeros(length(subg2[Coordinates]) - 1)
-    decay(x) = 6.82e21 * exp(-8.408e4 * x)
+    decay(x) = 6.82e27 * exp(-8.408e4 * x)
 
     for i in 1:length(subg1[Coordinates])
         gen1[i] = decay(subg1[Coordinates][i])
@@ -262,15 +259,8 @@ function main(;
         params.recombinationSRHLifetime[iphin, ireg] = τn[ireg]
         params.recombinationSRHLifetime[iphip, ireg] = τp[ireg]
 
-        # ## TODO: Trap densities
-
-        # if ireg == regionPoly || ireg == regionDonor
-        #     params.recombinationSRHTrapDensity[iphin, ireg] = 0.0 / (m^3)
-        #     params.recombinationSRHTrapDensity[iphip, ireg] = 0.0 / (m^3)
-        # else
-        #     params.recombinationSRHTrapDensity[iphin, ireg] = 2.0e21 / (m^3)
-        #     params.recombinationSRHTrapDensity[iphip, ireg] = 2.0e21 / (m^3)
-        # end
+        params.recombinationSRHTrapDensity[iphin, ireg] = 1.0e14 / (m^3)
+        params.recombinationSRHTrapDensity[iphip, ireg] = 1.0e14 / (m^3)
     end
 
     ##############################################################
@@ -300,13 +290,6 @@ function main(;
     # params.bRecombinationSRHTrapDensity[iphip, bregionJ2] = 1.0e17 / (m^3)
 
     ##############################################################
-
-    ## interior doping
-    # params.doping[iphip, regionCz] = Cn
-    # params.doping[iphin, regionPoly] = Cp
-
-    # println("DEBUG\nSUM: $(sum(numberOfNodes))")
-    # println("LENGTH: $(length(coord)))\n")
 
     ## Positive doping corresponds to acceptors
     for icoord in 1:numberOfNodes
@@ -405,7 +388,7 @@ function main(;
         Plotter.show()
     end
 
-    save_device_profile_csv("si-topcon-ill-sc.csv", solution, ctsys)
+    save_device_profile_csv("simulation_data/chargetransport/si-topcon-ill-sc.csv", solution, ctsys)
     exit()
     
     println("DEBUG/BL-MIN: $(data.generationData[length(gen1)])")

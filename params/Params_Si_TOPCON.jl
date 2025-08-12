@@ -51,17 +51,11 @@ Np = [1.04e25, 1.0e26] ./ (m^3)
 ε = [11.9, 11.9] .* 1.0  # a-Si and Cz-Si have similar values
 
 ## radiative recombination
-r0 = [0.0, 0.0] .* cm^3 / s  # Not provided, set to zero
+r0 = [4.22e-15, 4.22e-15] .* (cm^3) / (s)
 
 ## life times and trap densities
 τn = [1.0, 1.0] .* s  # a-Si (minority), Cz-Si, a-Si (minority)
 τp = [1.0, 1.0] .* s  # a-Si (majority), Cz-Si, a-Si (majority)
-
-## generation data
-# generation_uniform = [1.0e24, 0.0] ./ (m^3 * s)
-# incidentPhotonFlux = [4.3e21, 0.0] ./ (m^2 * s)
-# absorption = [1.61e6, 0.0] ./ m
-# generationPeak = 0.0
 
 ## doping
 Cem = 6.0e24 / (m^3)
