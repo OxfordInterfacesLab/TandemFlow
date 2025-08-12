@@ -2,6 +2,16 @@ using DataFrames
 using CSV
 using PyPlot
 
+struct DeviceInfo
+    x::Float64
+    n::Float64
+    p::Float64
+    Ec::Float64
+    Ev::Float64
+    Efn::Float64
+    Efp::Float64
+end
+
 """
 Convert a SCAPS file to a DataFrame.
 """
@@ -43,7 +53,6 @@ function ct_to_df(filename::String)
     return df
 end
 
-
 """
 Plots carrier density values from SCAPS and ChargeTransport
 """
@@ -61,4 +70,56 @@ function compare_densities(df_ct::DataFrame, df_scaps::DataFrame)
     title("Comparison of Carrier Densities")
     legend()
     grid(true)
+end
+
+"""
+Plots carrier density values from SCAPS and ChargeTransport
+"""
+function compare_bands(df_ct::DataFrame, df_scaps::DataFrame)
+    # Plotting
+    figure(figsize=(10, 6))
+    plot(df_ct[!, "x"], df_ct[!, "Ec"], color="black")
+    plot(df_ct[!, "x"], df_ct[!, "Ev"], color="black")
+    plot(df_ct[!, "x"], df_ct[!, "EFn"], color="blue")
+    plot(df_ct[!, "x"], df_ct[!, "EFp"], color="red")
+    plot(df_scaps[!, "x(um)"], df_scaps[!, "Ec(eV)"], color="black", linestyle="--")
+    plot(df_scaps[!, "x(um)"], df_scaps[!, "Ev(eV)"], color="black", linestyle="--")
+    plot(df_scaps[!, "x(um)"], df_scaps[!, "Fn(eV)"], color="blue", linestyle="--")
+    plot(df_scaps[!, "x(um)"], df_scaps[!, "Fp(eV)"], color="red", linestyle="--")
+
+    xlabel("x(um)")
+    ylabel("Energy (eV)")
+    title("Comparison of Energy Bands")
+    grid(true)
+end
+
+"""
+Create a CellInfo struct at a certain spatial position to learn all key information
+"""
+
+# TODO: Combine these functions
+function find_info_scaps(df::DataFrame, x::Float64)
+    idx = argmin(abs.(df[!, "x(um)"] .- x))
+    return CellInfo(
+        df[idx, "x(um)"],         # position
+        df[idx, "n(/cm3)"],       # electron density
+        df[idx, "p(/cm3)"],       # hole density
+        df[idx, "Ec(eV)"],            # conduction band edge
+        df[idx, "Ev(eV)"],            # valence band edge
+        df[idx, "Fn(eV)"],           # electron quasi-Fermi level
+        df[idx, "Fp(eV)"]            # hole quasi-Fermi level
+    )
+end
+
+function find_info_ct(df::DataFrame, x::Float64)
+    idx = argmin(abs.(df[!, "x"] .- x))
+    return CellInfo(
+        df[idx, "x"],         # position
+        df[idx, "n"],       # electron density
+        df[idx, "p"],       # hole density
+        df[idx, "Ec"],            # conduction band edge
+        df[idx, "Ev"],            # valence band edge
+        df[idx, "EFn"],           # electron quasi-Fermi level
+        df[idx, "EFp"]            # hole quasi-Fermi level
+    )
 end
