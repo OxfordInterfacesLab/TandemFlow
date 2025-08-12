@@ -173,11 +173,13 @@ function main(;
     bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # first  inner interface
 
     ## Plot node grid
-    # if plotting
-    #     gridplot(grid, Plotter = Plotter, legend = :lt)
-    #     Plotter.title("Grid")
-    #     Plotter.show()
-    # end
+    if plotting
+        gridplot(grid, Plotter = Plotter, legend = :lt)
+        Plotter.title("Grid")
+        Plotter.show()
+    end
+
+    exit()
 
     if test == false
         println("*** done\n")
