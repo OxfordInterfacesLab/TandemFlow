@@ -374,9 +374,6 @@ function main(;
     Vbi = solution[ipsi, end] - solution[ipsi, 1]
     println("Built-in Voltage: $(Vbi)V")
 
-    save_device_profile_csv("si-topcon-dark.csv", solution, ctsys)
-    exit()
-
     ### D: ILLUMINATION
 
     I = collect(20:-0.5:0.0)
@@ -396,8 +393,6 @@ function main(;
 
     end # generation loop
 
-    
-
     # save_device_profile_csv("si_1_ill_sc.csv", solution, ctsys)
     # Plot illuminated short-circuit
     if plotting
@@ -407,6 +402,9 @@ function main(;
         plot_densities(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_density)
         Plotter.show()
     end
+
+    save_device_profile_csv("si-topcon-ill-sc.csv", solution, ctsys)
+    exit()
     
     println("DEBUG/BL-MIN: $(data.generationData[length(gen1)])")
     Plotter.figure()
