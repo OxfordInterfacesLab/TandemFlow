@@ -6,6 +6,9 @@ using PyPlot
 using CSV
 using DataFrames
 
+include("../utils/ct_utils.jl")
+using .CTUtils
+
 # Plotting with scienceplots
 using PyCall
 pyimport("scienceplots")
@@ -192,10 +195,9 @@ function main(;
     subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
 
     gen1 = zeros(length(subg1[Coordinates])); gen2 = zeros(length(subg2[Coordinates]) - 1)
-    decay(x) = 6.82e27 * exp(-8.408e4 * x)
 
     for i in 1:length(subg1[Coordinates])
-        gen1[i] = decay(subg1[Coordinates][i])
+        gen1[i] = generation_from_scaps("simulation_data/scaps/si-topcon-auto.gen", subg1[Coordinates][i])
     end
 
     generationData = [gen1; gen2]
