@@ -271,6 +271,9 @@ function main(;
     params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionCz]
     params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionCz]
 
+    params.SchottkyBarrier[bregionCz] = 0.0
+    params.SchottkyBarrier[bregionPoly] = 0.0
+    
     params.bVelocity[iphin, bregionCz] = 1.0e-2 * cm/s
     params.bVelocity[iphip, bregionCz] = 1.0e7 * cm/s
 
@@ -309,9 +312,8 @@ function main(;
     control = SolverControl()
     control.verbose = verbose
     control.maxiters = 1000
-    control.damp_initial = 0.6
-    control.damp_growth = 1.61 # >= 1
-    # control.max_round = 5
+    control.damp_initial = 0.5
+    control.damp_growth = 1.51 # >= 1
 
     if test == false
         println("*** done\n")
@@ -326,8 +328,7 @@ function main(;
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
 
-    save_device_profile_csv("simulation_data/chargetransport/si-topcon-dark.csv", solution, ctsys)
-    exit()
+    save_device_profile_csv("simulation_data/chargetransport/si-topcon-dark-sc.csv", solution, ctsys)
 
     if plotting == true
         ################################################################################
@@ -350,7 +351,7 @@ function main(;
 
     ### D: ILLUMINATION
 
-    I = collect(20:-0.5:0.0)
+    I = collect(20:-0.2:0.0)
     LAMBDA = 10 .^ (-I)
 
     for istep in 1:(length(I) - 1)
@@ -377,7 +378,7 @@ function main(;
         Plotter.show()
     end
 
-    save_device_profile_csv("simulation_data/chargetransport/si-topcon-ill-sc.csv", solution, ctsys)
+    save_device_profile_csv("simulation_data/chargetransport/si-topcon-illuminated-sc.csv", solution, ctsys)
     exit()
     
     println("DEBUG/BL-MIN: $(data.generationData[length(gen1)])")
