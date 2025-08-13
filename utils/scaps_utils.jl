@@ -58,13 +58,21 @@ end
 """
 Plots carrier density values from SCAPS and ChargeTransport
 """
-function compare_densities(df_ct::DataFrame, df_scaps::DataFrame)
+function compare_densities(df_ct::DataFrame, df_scaps::DataFrame; xrange=nothing)
+    df_ct_plot = df_ct
+    df_scaps_plot = df_scaps
+
+    if xrange !== nothing
+        xmin, xmax = xrange
+        df_ct_plot = filter(row -> xmin <= row["x"] <= xmax, df_ct)
+        df_scaps_plot = filter(row -> xmin <= row["x(um)"] <= xmax, df_scaps)
+    end
     # Plotting
     figure(figsize=(10, 6))
-    plot(df_ct[!, "x"], df_ct[!, "n"], label="CT (n)", color="blue")
-    plot(df_scaps[!, "x(um)"], df_scaps[!, "n(/cm3)"], label="SCAPS (n)", color="blue", linestyle="--")
-    plot(df_ct[!, "x"], df_ct[!, "p"], label="CT (p)", color="red")
-    plot(df_scaps[!, "x(um)"], df_scaps[!, "p(/cm3)"], label="SCAPS (p)", color="red", linestyle="--")
+    plot(df_ct_plot[!, "x"], df_ct_plot[!, "n"], label="CT (n)", color="blue")
+    plot(df_scaps_plot[!, "x(um)"], df_scaps_plot[!, "n(/cm3)"], label="SCAPS (n)", color="blue", linestyle="--")
+    plot(df_ct_plot[!, "x"], df_ct_plot[!, "p"], label="CT (p)", color="red")
+    plot(df_scaps_plot[!, "x(um)"], df_scaps_plot[!, "p(/cm3)"], label="SCAPS (p)", color="red", linestyle="--")
 
     yscale("log")
     xlabel("x(um)")
@@ -77,17 +85,26 @@ end
 """
 Plots carrier density values from SCAPS and ChargeTransport
 """
-function compare_bands(df_ct::DataFrame, df_scaps::DataFrame)
+function compare_bands(df_ct::DataFrame, df_scaps::DataFrame; xrange=nothing)
     # Plotting
+    df_ct_plot = df_ct
+    df_scaps_plot = df_scaps
+
+    if xrange !== nothing
+        xmin, xmax = xrange
+        df_ct_plot = filter(row -> xmin <= row["x"] <= xmax, df_ct)
+        df_scaps_plot = filter(row -> xmin <= row["x(um)"] <= xmax, df_scaps)
+    end
+
     figure(figsize=(10, 6))
-    plot(df_ct[!, "x"], df_ct[!, "Ec"], color="black")
-    plot(df_ct[!, "x"], df_ct[!, "Ev"], color="black")
-    plot(df_ct[!, "x"], df_ct[!, "EFn"], color="blue")
-    plot(df_ct[!, "x"], df_ct[!, "EFp"], color="red")
-    plot(df_scaps[!, "x(um)"], df_scaps[!, "Ec(eV)"], color="black", linestyle="--")
-    plot(df_scaps[!, "x(um)"], df_scaps[!, "Ev(eV)"], color="black", linestyle="--")
-    plot(df_scaps[!, "x(um)"], df_scaps[!, "Fn(eV)"], color="blue", linestyle="--")
-    plot(df_scaps[!, "x(um)"], df_scaps[!, "Fp(eV)"], color="red", linestyle="--")
+    plot(df_ct_plot[!, "x"], df_ct_plot[!, "Ec"], color="black")
+    plot(df_ct_plot[!, "x"], df_ct_plot[!, "Ev"], color="black")
+    plot(df_ct_plot[!, "x"], df_ct_plot[!, "EFn"], color="blue")
+    plot(df_ct_plot[!, "x"], df_ct_plot[!, "EFp"], color="red")
+    plot(df_scaps_plot[!, "x(um)"], df_scaps_plot[!, "Ec(eV)"], color="black", linestyle="--")
+    plot(df_scaps_plot[!, "x(um)"], df_scaps_plot[!, "Ev(eV)"], color="black", linestyle="--")
+    plot(df_scaps_plot[!, "x(um)"], df_scaps_plot[!, "Fn(eV)"], color="blue", linestyle="--")
+    plot(df_scaps_plot[!, "x(um)"], df_scaps_plot[!, "Fp(eV)"], color="red", linestyle="--")
 
     xlabel("x(um)")
     ylabel("Energy (eV)")

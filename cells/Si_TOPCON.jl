@@ -116,7 +116,7 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    voltageAcceptor = 0.75 * V
+    voltageAcceptor = 0.85 * V
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s
@@ -218,9 +218,9 @@ function main(;
 
     data.generationModel = GenerationUserDefined
 
-    data.boundaryType[bregionPoly] = OhmicContact
+    data.boundaryType[bregionPoly] = SchottkyContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
-    data.boundaryType[bregionCz] = OhmicContact
+    data.boundaryType[bregionCz] = SchottkyContact
 
     data.fluxApproximation .= ExcessChemicalPotential
 
@@ -275,14 +275,15 @@ function main(;
 
     # Schottky Implementation (didn't fix issues)
 
-    # params.SchottkyBarrier[bregionCz] = 1.10 * (eV)
-    # params.SchottkyBarrier[bregionPoly] = 0.0 * (eV)
+    # just picked these values - need to justify
+    params.SchottkyBarrier[bregionCz] = 1.10 * (eV)
+    params.SchottkyBarrier[bregionPoly] = 0.0 * (eV)
 
-    # params.bVelocity[iphin, bregionCz] = 1.0e-2 * cm/s
-    # params.bVelocity[iphip, bregionCz] = 1.0e7 * cm/s
+    params.bVelocity[iphin, bregionCz] = 1.0e-2 * cm/s
+    params.bVelocity[iphip, bregionCz] = 1.0e7 * cm/s
 
-    # params.bVelocity[iphin, bregionPoly] = 1.0e7 * cm/s
-    # params.bVelocity[iphip, bregionPoly] = 1.0e-2 * cm/s
+    params.bVelocity[iphin, bregionPoly] = 1.0e7 * cm/s
+    params.bVelocity[iphip, bregionPoly] = 1.0e-2 * cm/s
 
     ## Positive doping corresponds to acceptors
     for icoord in 1:numberOfNodes
@@ -303,6 +304,12 @@ function main(;
     data.paramsnodal = paramsnodal
 
     ctsys = System(grid, data, unknown_storage = :sparse)
+
+    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionCz] = 1.0e30
+    # ctsys.fvmsys.boundary_values[data.index_psi, bregionCz] = -5.13
+
+    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionPoly] = 1.0e30
+    # ctsys.fvmsys.boundary_values[data.index_psi, bregionPoly] = -3.88
 
     if test == false
         println("*** done\n")
@@ -332,7 +339,7 @@ function main(;
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
 
-    save_device_profile_csv("simulation_data/chargetransport/si-topcon-dark-sc.csv", solution, ctsys)
+    save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
 
     if plotting == true
         ################################################################################
@@ -354,6 +361,12 @@ function main(;
     println("Built-in Voltage: $(Vbi)V")
 
     ### D: ILLUMINATION
+
+    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionCz] = 0
+    # ctsys.fvmsys.boundary_values[data.index_psi, bregionCz] = 0
+
+    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionPoly] = 0
+    # ctsys.fvmsys.boundary_values[data.index_psi, bregionPoly] = 0
 
     I = collect(20:-0.2:0.0)
     LAMBDA = 10 .^ (-I)
@@ -382,12 +395,7 @@ function main(;
         Plotter.show()
     end
 
-    save_device_profile_csv("simulation_data/chargetransport/si-topcon-illuminated-sc.csv", solution, ctsys)
-    
-    println("DEBUG/BL-MIN: $(data.generationData[length(gen1)])")
-    Plotter.figure()
-    Plotter.plot(coord, data.generationData)
-    Plotter.show()
+    save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
 
     if test == false
         println("*** done\n")
@@ -454,4 +462,4 @@ function main(;
 end
 
 # DEBUG
-main(n = 12, verbose = true)
+main(n = 40, verbose = true)
