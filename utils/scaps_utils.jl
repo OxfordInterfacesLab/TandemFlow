@@ -142,3 +142,39 @@ function find_info_ct(df::DataFrame, x::Float64)
         df[idx, "EFp"]            # hole quasi-Fermi level
     )
 end
+
+function scaps_to_df_iv(filename::String)
+    lines = readlines(filename)
+    # Find IV/START and IV/END
+    start_idx = findfirst(x -> occursin("IV/START", x), lines)
+    end_idx = findfirst(x -> occursin("IV/END", x), lines)
+    if isnothing(start_idx) || isnothing(end_idx) || end_idx <= start_idx
+        error("Could not find IV/START and IV/END or invalid order.")
+    end
+    # The header is the line after IV/START
+    header_line = strip(lines[start_idx + 1])
+    header = split(header_line)
+    # Data lines are between header and IV/END
+    data_lines = lines[(start_idx + 2):(end_idx - 1)]
+    # Remove empty lines
+    data_lines = filter(x -> !isempty(strip(x)), data_lines)
+    # Split and parse each data line
+    data = [split(strip(line)) for line in data_lines]
+    # Convert to Float64 if possible
+    data = [map(x -> tryparse(Float64, x) === nothing ? x : parse(Float64, x), row) for row in data]
+    df = DataFrame([getindex.(data, i) for i in 1:length(header)], Symbol.(header))
+    return df
+end
+
+function compare_iv(df_ct::DataFrame, df_scaps::DataFrame)
+    # Plotting IV curves
+    figure(figsize=(10, 6))
+    plot(df_ct[!, "V"], df_ct[!, "J"], label="CT", color="blue")
+    plot(df_scaps[!, "v(V)"], df_scaps[!, "jtot(mA/cm2)"], label="SCAPS", color="red", linestyle="--")
+
+    xlabel("Voltage (V)")
+    ylabel("Current Density (mA/cm2)")
+    title("IV Curve Comparison")
+    legend()
+    grid(true)
+end

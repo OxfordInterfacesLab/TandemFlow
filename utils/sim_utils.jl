@@ -50,3 +50,12 @@ function generation_from_scaps(filename::String, xq::Float64)
         return G1 * exp(log(G2/G1) * (xq - x1) / (x2 - x1)) * 1e6
     end
 end
+
+function save_iv(filename::String, biasValues, IV)
+    df = DataFrame(
+        V = biasValues,
+        J = IV
+    )
+
+    CSV.write(filename, df)
+end

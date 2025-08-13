@@ -116,7 +116,7 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    voltageAcceptor = 0.85 * V
+    voltageAcceptor = 0.95 * V
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s
@@ -385,7 +385,6 @@ function main(;
 
     end # generation loop
 
-    # save_device_profile_csv("si_1_ill_sc.csv", solution, ctsys)
     # Plot illuminated short-circuit
     if plotting
         Plotter.figure()
@@ -443,7 +442,7 @@ function main(;
     # plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(vend)")
     # show()
 
-    IV = IV
+    save_iv("simulation_data/chargetransport/si-topcon-schottky-iv.csv", biasValues, IV)
 
     powerDensity = biasValues .* (IV)           # power density function
     MaxPD, indexPD = findmax(powerDensity)
