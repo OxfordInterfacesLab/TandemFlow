@@ -216,9 +216,9 @@ function main(;
 
     data.generationModel = GenerationUserDefined
 
-    data.boundaryType[bregionPoly] = SchottkyContact
+    data.boundaryType[bregionPoly] = OhmicContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
-    data.boundaryType[bregionCz] = SchottkyContact
+    data.boundaryType[bregionCz] = OhmicContact
 
     data.fluxApproximation .= ExcessChemicalPotential
 
@@ -256,8 +256,8 @@ function main(;
 
         ## recombination parameters
         params.recombinationRadiative[ireg] = r0[ireg]
-        params.recombinationSRHLifetime[iphin, ireg] = τn[ireg]
-        params.recombinationSRHLifetime[iphip, ireg] = τp[ireg]
+        params.recombinationSRHLifetime[iphin, ireg] = τcz[ireg]
+        params.recombinationSRHLifetime[iphip, ireg] = τpoly[ireg]
 
         params.recombinationSRHTrapDensity[iphin, ireg] = 1.0e14 / (m^3)
         params.recombinationSRHTrapDensity[iphip, ireg] = 1.0e14 / (m^3)
@@ -271,14 +271,16 @@ function main(;
     params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionCz]
     params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionCz]
 
-    params.SchottkyBarrier[bregionCz] = 0.0
-    params.SchottkyBarrier[bregionPoly] = 0.0
-    
-    params.bVelocity[iphin, bregionCz] = 1.0e-2 * cm/s
-    params.bVelocity[iphip, bregionCz] = 1.0e7 * cm/s
+    # Schottky Implementation (didn't fix issues)
 
-    params.bVelocity[iphin, bregionPoly] = 1.0e7 * cm/s
-    params.bVelocity[iphip, bregionPoly] = 1.0e-2 * cm/s
+    # params.SchottkyBarrier[bregionCz] = 1.10 * (eV)
+    # params.SchottkyBarrier[bregionPoly] = 0.0 * (eV)
+
+    # params.bVelocity[iphin, bregionCz] = 1.0e-2 * cm/s
+    # params.bVelocity[iphip, bregionCz] = 1.0e7 * cm/s
+
+    # params.bVelocity[iphin, bregionPoly] = 1.0e7 * cm/s
+    # params.bVelocity[iphip, bregionPoly] = 1.0e-2 * cm/s
 
     ## Positive doping corresponds to acceptors
     for icoord in 1:numberOfNodes
