@@ -116,7 +116,7 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    voltageAcceptor = 0.9 * V
+    voltageAcceptor = 0.75 * V
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s
@@ -267,11 +267,11 @@ function main(;
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
-    params.bDensityOfStates[iphin, bregionJ1] = Nn[regionCz]
-    params.bDensityOfStates[iphip, bregionJ1] = Np[regionCz]
+    params.bDensityOfStates[iphin, bregionJ1] = Nn[regionPoly]
+    params.bDensityOfStates[iphip, bregionJ1] = Np[regionPoly]
 
-    params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionCz]
-    params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionCz]
+    params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionPoly]
+    params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionPoly]
 
     # Schottky Implementation (didn't fix issues)
 
@@ -383,7 +383,6 @@ function main(;
     end
 
     save_device_profile_csv("simulation_data/chargetransport/si-topcon-illuminated-sc.csv", solution, ctsys)
-    exit()
     
     println("DEBUG/BL-MIN: $(data.generationData[length(gen1)])")
     Plotter.figure()
@@ -432,16 +431,11 @@ function main(;
 
     end # time loop
 
-    plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(vend)")
-    show()
+    # Plot IV curve
+    # plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(vend)")
+    # show()
 
     IV = IV
-
-    ## DEBUG
-    target = 0.7244
-    idx = findmin(abs.(biasValues .- target))[2]
-    value_at_idx = IV[idx]
-    println("Index: ", idx, ", biasValue: ", biasValues[idx], ", IV: ", value_at_idx)
 
     powerDensity = biasValues .* (IV)           # power density function
     MaxPD, indexPD = findmax(powerDensity)
@@ -453,18 +447,10 @@ function main(;
     efficiency = biasValues[indexPD] * IV[indexPD] / IncidentLightPowerDensity
     fillfactor = (biasValues[indexPD] * IV[indexPD]) / (IV[1] * Voc)
 
-    println("Isc = $(Isc))")
+    println("\nIsc = $(Isc)")
     println("Voc = $(Voc)")
     println("FF = $(fillfactor)")
     println("PCE = $(efficiency)")
-
-    if test == false
-        println("*** done\n")
-    end
-
-    testval = sum(filter(!isnan, solution)) / length(solution) # when using sparse storage, we get NaN values in solution
-    return testval
-
 end
 
 # DEBUG
