@@ -411,7 +411,7 @@ function main(;
     ## for saving I-V data
     IV = zeros(0) # for IV values
     biasValues = zeros(0) # for bias values
-    tested = false
+    VocExceeded = false # flag for Voc exceeded
 
     for istep in 2:ntsteps
 
@@ -432,10 +432,27 @@ function main(;
         ## get I-V data
         current = get_current_val(ctsys, solution, inival, Δt)
 
+        if current < 0.0 && VocExceeded == false
+            VocExceeded = true
+            # Plot bands and carrier densities at Voc
+            PyPlot.rc("figure", figsize=(18, 8))
+            fig = Plotter.figure()
+
+            fig.suptitle("Illuminated, Bias = $(round(Δu, digits=2))", fontsize=16)
+
+            Plotter.subplot(1, 2, 1)
+            plot_energies(Plotter, ctsys, solution, "Band Diagram", label_energy, clear=false)
+            Plotter.subplot(1, 2, 2)
+            plot_densities(Plotter, ctsys, solution, "Carrier Densities", label_density, clear=false)
+
+            save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-oc.csv", solution, ctsys)
+
+            fig.tight_layout()
+            Plotter.show()
+        end
+
         push!(IV, current)
         push!(biasValues, Δu)
-
-
     end # time loop
 
     # Plot IV curve
