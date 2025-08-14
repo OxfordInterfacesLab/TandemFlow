@@ -1,5 +1,3 @@
-ENV["MPLBACKEND"] = "qt5agg"
-
 using ChargeTransport
 using ExtendableGrids
 using PyPlot
@@ -15,87 +13,21 @@ pyimport("scienceplots")
 mpl = PyPlot.matplotlib
 plt.style.use(["science","nature"])
 PyPlot.rc("figure", figsize=(8, 8))
-PyPlot.rc("axes", titlesize=16)       # Title of plots
-PyPlot.rc("axes", labelsize=14)       # Axis labels
-PyPlot.rc("xtick", labelsize=12)      # X-tick labels
-PyPlot.rc("ytick", labelsize=12)      # Y-tick labels
-PyPlot.rc("legend", fontsize=12)      # Legend text
+PyPlot.rc("axes", titlesize=16)
+PyPlot.rc("axes", labelsize=14)
+PyPlot.rc("xtick", labelsize=12)
+PyPlot.rc("ytick", labelsize=12)
+PyPlot.rc("legend", fontsize=12)
+ENV["MPLBACKEND"] = "qt5agg"
 
-function middle_element(A)
-    idx = (length(A) + 1) ÷ 2
-    return A[idx]
-end
+toPlot = Dict(
+    "grid" => false,
+    "dark-sc" => false,
+    "light-sc" => false,
+    "light-oc" => false,
+    "iv" => false
+)
 
-#=
-tanh-like drop from `ymax` to `ymin` between x0..x1, then stays at `ymin`.
-
-Arguments:
-- x0: start of transition
-- x1: end of transition
-- ymin, ymax: target bounds
-- sharpness: larger => steeper transition
-=#
-function tanh_plateau(x; x0=0.0, x1=10.0, ymin=0.0, ymax=1.0, sharpness=8.0)
-    x1 <= x0 && throw(ArgumentError("require x1 > x0"))
-    if x <= x0
-        return ymax
-    elseif x >= x1
-        return ymin
-    else
-        k   = sharpness / (x1 - x0)
-        mid = (x0 + x1)/2
-        # tanh gives ~+1 near x0 and ~-1 near x1
-        t = (tanh(k*(mid - x)) + 1) / 2   # maps [-1,1] -> [0,1]
-        return ymin + (ymax - ymin) * t
-    end
-end
-
-# save profile as a CSV file
-function save_device_profile_csv(filename, solution, ctsys)
-    grid = ctsys.fvmsys.grid
-    data = ctsys.fvmsys.physics.data
-
-    x = zeros(0)
-    n = zeros(0)
-    p = zeros(0)
-    Ec = zeros(0)
-    Ev = zeros(0)
-    EFn = zeros(0)
-    EFp = zeros(0)
-
-    for ireg in 1:numberOfRegions
-        subg = subgrid(grid, [ireg])
-
-        Ec0 = get_BEE(iphip, ireg, ctsys)
-        Ev0 = get_BEE(iphin, ireg, ctsys)
-        solpsi = view(solution[data.index_psi, :], subg)
-        solp = view(solution[iphip, :], subg)
-        soln = view(solution[iphin, :], subg)
-
-        append!(x, subg[Coordinates]')
-        append!(n, get_density(solution, ireg, ctsys, iphin))
-        append!(p, get_density(solution, ireg, ctsys, iphip))
-        append!(Ec, Ec0 ./ q .- solpsi)
-        append!(Ev, Ev0 ./ q .- solpsi)
-        append!(EFn, -soln)
-        append!(EFp, -solp)
-    end
-
-    # Build DataFrame
-    df = DataFrame(
-        x = x,
-        n = n,
-        p = p,
-        Ec = Ec,
-        Ev = Ev,
-        EFn = EFn,
-        EFp = EFp
-    )
-
-    CSV.write(filename, df)
-end
-
-# you can also use other Plotters, if you add them to the example file
 function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
@@ -107,49 +39,37 @@ function main(;
         Plotter.close("all")
     end
 
-    ################################################################################
-    if test == false
-        println("Define physical parameters and model")
-    end
-    ################################################################################
+    println("--- Define physical parameters and model ---")
 
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    voltageAcceptor = 0.95 * V
+    maxVoltage = 0.95 * V
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s
     ntsteps = 151
-    vend = voltageAcceptor # bias goes until the given voltage at acceptor boundary
-    tend = vend / scanrate
+    tend = maxVoltage / scanrate
 
-    ## with fixed timestep sizes we can calculate the times a priori
     tvalues = range(0, stop = tend, length = ntsteps)
 
-    if test == false
-        println("*** done\n")
-    end
-
-    ################################################################################
-    if test == false
-        println("Set up grid and regions")
-    end
-    ################################################################################
-
-    # TODO: Need density increase around interface
+    println("--- Set up grid and regions ---")
 
     δ = 6 * n        # the larger, the finer the mesh
     t = 0.5 * (cm) / δ # tolerance for geomspace and glue (with factor 10)
     k = 1.5        # the closer to 1, the closer to the boundary geomspace
 
-    coord_em = collect(range(0.0, 3*h_emitter, step = h_emitter / (0.8 * δ)))
+    coord_em = collect(range(0.0, 3*h_emitter, step = h_emitter / (0.8 * δ))) # p+ emitter
+
+    # n C-Si region
     coord_cz_u = collect(range(3*h_emitter, 0.95 * h_cz, step = h_cz / (0.8 * δ)))
     coord_cz_g = geomspace(
         0.95 * h_cz, h_cz,
         (0.05 * h_cz) / (0.7 * δ), (0.05 * h_cz) / (1.1 * δ),
         tol = t
     )
+
+    # n poly-Si region
     coord_poly_g = geomspace(
         h_cz, h_cz + h_poly / 2,
         h_poly / (1.3 * δ), h_poly / (0.6 * δ),
@@ -166,47 +86,39 @@ function main(;
     numberOfNodes = length(coord)
 
     ## set different regions in grid
-    cellmask!(grid, [0.0], [heightLayers[1]], regionCz, tol = 1.0e-18) # intrinsic region = 2
-    cellmask!(grid, [heightLayers[1]], [heightLayers[2]], regionPoly, tol = 1.0e-18)  # p-doped region   = 3
+    cellmask!(grid, [0.0], [heightLayers[1]], regionCz, tol = 1.0e-18) # n C-Si
+    cellmask!(grid, [heightLayers[1]], [heightLayers[2]], regionPoly, tol = 1.0e-18)  # n poly-Si
 
     ## bfacemask! for setting different boundary regions
-    bfacemask!(grid, [0.0], [0.0], bregionCz, tol = 1.0e-18)     # outer left boundary
-    bfacemask!(grid, [h_total], [h_total], bregionPoly, tol = 1.0e-18)  # outer right boundary
-    bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # first  inner interface
+    bfacemask!(grid, [0.0], [0.0], bregionCz, tol = 1.0e-18) # n C-Si outer boundary
+    bfacemask!(grid, [h_total], [h_total], bregionPoly, tol = 1.0e-18)  # n poly-Si outer boundary
+    bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # junction
 
     ## Plot node grid
-    # if plotting
-    #     gridplot(grid, Plotter = Plotter, legend = :lt)
-    #     Plotter.title("Grid")
-    #     Plotter.show()
-    # end
-
-    if test == false
-        println("*** done\n")
+    if toPlot["grid"]
+        gridplot(grid, Plotter = Plotter, legend = :lt)
+        Plotter.title("Grid")
+        Plotter.show()
     end
 
-    ################################################################################
-    if test == false
-        println("Define System and fill in information about model")
-    end
-    ################################################################################
+    println("--- Define system and fill in information about model ---")
 
     ## set up generation data
     subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
 
-    gen1 = zeros(length(subg1[Coordinates])); gen2 = zeros(length(subg2[Coordinates]) - 1)
+    generation_file = "simulation_data/scaps/si-topcon-auto.gen"
+    generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
 
-    for i in 1:length(subg1[Coordinates])
-        gen1[i] = generation_from_scaps("simulation_data/scaps/si-topcon-auto.gen", subg1[Coordinates][i])
-    end
+    gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
+    gen2 = zeros(length(subg2[Coordinates]) - 1) # set absorption in poly layer to zero
 
     generationData = [gen1; gen2]
 
     ## Initialize Data instance and fill in data
     data = Data(grid, numberOfCarriers, generationData = generationData)
 
-    data.modelType = Transient
-    carrier_stats = Boltzmann
+    data.modelType = Transient # choices: Transient, Stationary
+    carrier_stats = Boltzmann # TODO: choices
     data.F = [carrier_stats, carrier_stats]
 
     data.bulkRecombination = set_bulk_recombination(;
@@ -224,15 +136,7 @@ function main(;
 
     data.fluxApproximation .= ExcessChemicalPotential
 
-    if test == false
-        println("*** done\n")
-    end
-
-    ################################################################################
-    if test == false
-        println("Define Params and fill in physical parameters")
-    end
-    ################################################################################
+    println("--- Define Params ---")
 
     params = Params(grid, numberOfCarriers)
     paramsnodal = ParamsNodal(grid, numberOfCarriers)
@@ -273,9 +177,8 @@ function main(;
     params.bBandEdgeEnergy[iphin, bregionJ1] = En[regionPoly]
     params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionPoly]
 
-    # Schottky Implementation (didn't fix issues)
-
-    # just picked these values - need to justify
+    # Schottky Barrier
+    # TODO: just picked these values - need to justify
     params.SchottkyBarrier[bregionCz] = 1.10 * (eV)
     params.SchottkyBarrier[bregionPoly] = 0.0 * (eV)
 
@@ -288,7 +191,7 @@ function main(;
     ## Positive doping corresponds to acceptors
     for icoord in 1:numberOfNodes
         if icoord <= (length(coord_em) + length(coord_cz_u) + length(coord_cz_g) - 2) # n C-Si region
-            paramsnodal.doping[icoord] = tanh_plateau(coord[icoord]; 
+            paramsnodal.doping[icoord] = tanh_diffusion_profile(coord[icoord]; 
                 x0 = 0.0,
                 x1 = h_emitter,
                 ymin = -Ccz,
@@ -305,20 +208,7 @@ function main(;
 
     ctsys = System(grid, data, unknown_storage = :sparse)
 
-    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionCz] = 1.0e30
-    # ctsys.fvmsys.boundary_values[data.index_psi, bregionCz] = -5.13
-
-    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionPoly] = 1.0e30
-    # ctsys.fvmsys.boundary_values[data.index_psi, bregionPoly] = -3.88
-
-    if test == false
-        println("*** done\n")
-    end
-    ################################################################################
-    if test == false
-        println("Define control parameters for Solver")
-    end
-    ################################################################################
+    println("--- Define control parameters for solver ---")
 
     control = SolverControl()
     control.verbose = verbose
@@ -339,9 +229,9 @@ function main(;
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
 
-    save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
+    save_device_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
 
-    if plotting == true
+    if plotting == true && toPlot["dark-sc"]
         ################################################################################
         println("Plot electroneutral potential, band-edge energies and doping")
         ################################################################################
@@ -355,18 +245,7 @@ function main(;
         Plotter.show()
     end
 
-    ## DARK EQUILIBRIUM
-    ipsi = ctsys.fvmsys.physics.data.index_psi
-    Vbi = solution[ipsi, end] - solution[ipsi, 1]
-    println("Built-in Voltage: $(Vbi)V")
-
     ### D: ILLUMINATION
-
-    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionCz] = 0
-    # ctsys.fvmsys.boundary_values[data.index_psi, bregionCz] = 0
-
-    # ctsys.fvmsys.boundary_factors[data.index_psi, bregionPoly] = 0
-    # ctsys.fvmsys.boundary_values[data.index_psi, bregionPoly] = 0
 
     I = collect(20:-0.2:0.0)
     LAMBDA = 10 .^ (-I)
@@ -386,7 +265,7 @@ function main(;
     end # generation loop
 
     # Plot illuminated short-circuit
-    if plotting
+    if plotting && toPlot["light-sc"]
         Plotter.figure()
         plot_energies(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_energy)
         Plotter.figure()
@@ -394,7 +273,7 @@ function main(;
         Plotter.show()
     end
 
-    save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
+    # save_device_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
 
     if test == false
         println("*** done\n")
@@ -406,15 +285,12 @@ function main(;
     end
     ################################################################################
 
-    Isc = get_current_val(ctsys, solution)
-
     ## for saving I-V data
     IV = zeros(0) # for IV values
     biasValues = zeros(0) # for bias values
     VocExceeded = [false, false] # first term for if scaps Voc exceeded, second for if current < 0
 
     for istep in 2:ntsteps
-
         t = tvalues[istep]       # Actual time
         Δu = t * scanrate         # Applied voltage
         Δt = t - tvalues[istep - 1] # Time step size
@@ -434,27 +310,29 @@ function main(;
 
         if Δu >= 0.7400 && VocExceeded[1] == false
             VocExceeded[1] = true
-            save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
+            # save_device_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
         end
 
         if current < 0.0 && VocExceeded[2] == false
             VocExceeded[2] = true
             # Plot bands and carrier densities at Voc
-            PyPlot.rc("figure", figsize=(18, 8))
-            fig = Plotter.figure()
+            if plotting && toPlot["light-oc"]
+                PyPlot.rc("figure", figsize=(18, 8))
+                fig = Plotter.figure()
 
-            fig.suptitle("Illuminated, Bias = $(round(Δu, digits=2))", fontsize=16)
+                fig.suptitle("Illuminated, Bias = $(round(Δu, digits=2))", fontsize=16)
 
-            Plotter.subplot(1, 2, 1)
-            plot_energies(Plotter, ctsys, solution, "Band Diagram", label_energy, clear=false)
-            Plotter.subplot(1, 2, 2)
-            plot_densities(Plotter, ctsys, solution, "Carrier Densities", label_density, clear=false)
+                Plotter.subplot(1, 2, 1)
+                plot_energies(Plotter, ctsys, solution, "Band Diagram", label_energy, clear=false)
+                Plotter.subplot(1, 2, 2)
+                plot_densities(Plotter, ctsys, solution, "Carrier Densities", label_density, clear=false)
 
-            save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-oc.csv", solution, ctsys)
-            println("Voc = $(Δu)V")
+                # save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-oc.csv", solution, ctsys)
+                println("Voc = $(Δu)V")
 
-            fig.tight_layout()
-            Plotter.show()
+                fig.tight_layout()
+                Plotter.show()
+            end
         end
 
         push!(IV, current)
@@ -462,9 +340,11 @@ function main(;
     end # time loop
 
     # Plot IV curve
-    # plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(vend)")
-    # show()
-
+    if plotting && toPlot["iv"]
+        plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(maxVoltage)")
+        show()
+    end
+    
     save_iv("simulation_data/chargetransport/si-topcon-schottky-iv.csv", biasValues, IV)
 
     powerDensity = biasValues .* (IV)           # power density function
@@ -474,10 +354,10 @@ function main(;
 
     IncidentLightPowerDensity = 1000.0 * W / m^2
 
-    efficiency = biasValues[indexPD] * IV[indexPD] / IncidentLightPowerDensity
+    efficiency = MaxPD / IncidentLightPowerDensity
     fillfactor = (biasValues[indexPD] * IV[indexPD]) / (IV[1] * Voc)
 
-    println("\nIsc = $(Isc)")
+    println("\nIsc = $(IV[1])")
     println("Voc = $(Voc)")
     println("FF = $(fillfactor)")
     println("PCE = $(efficiency)")

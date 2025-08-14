@@ -3,52 +3,73 @@ using DataFrames
 using CSV
 using PyPlot
 
-function scaps_to_df_generation(filename::String)
-    lines = readlines(filename)
-    # Find the line containing 'GEN'
-    gen_idx = findfirst(x -> occursin("GEN", x), lines)
-    if isnothing(gen_idx) || gen_idx == length(lines)
-        error("No GEN line or header found in file.")
-    end
-    # The header is the line after 'GEN'
-    header_idx = gen_idx + 1
-    header = strip.(split(strip(lines[header_idx]), '\t'))
-    # Data starts after the header
-    data_start = header_idx + 1
-    data_lines = filter(x -> !isempty(strip(x)), lines[data_start:end])
-    # Split each data line into fields using tab delimiter
-    data = [split(strip(line), '\t') for line in data_lines]
-    # Convert to numbers if possible
-    data = [map(x -> tryparse(Float64, x) === nothing ? x : parse(Float64, x), row) for row in data]
-    df = DataFrame([getindex.(data, i) for i in 1:length(header)], Symbol.(header))
+#######################################################
+#######################################################
 
-    return df
+"""
+tanh function for error function-esque diffusion profile
+
+Profile drops from ymax to ymin between x0 and x1
+"""
+function tanh_diffusion_profile(x; x0=0.0, x1=10.0, ymin=0.0, ymax=1.0, sharpness=8.0)
+    x1 <= x0 && throw(ArgumentError("require x1 > x0"))
+
+    if x <= x0
+        return ymax
+    elseif x >= x1
+        return ymin
+    else
+        k   = sharpness / (x1 - x0)
+        mid = (x0 + x1)/2
+        t = (tanh(k*(mid - x)) + 1) / 2
+        return ymin + (ymax - ymin) * t
+    end
+
 end
 
-function generation_from_scaps(filename::String, xq::Float64)
-    df_gen = scaps_to_df_generation(filename)
+# save profile as a CSV file
+function save_device_profile(filename, solution, ctsys)
+    grid = ctsys.fvmsys.grid
+    data = ctsys.fvmsys.physics.data
 
-    x = df_gen[!, "x (um)"]
-    Geh = df_gen[!, "Geh (#/cm3.s)"]
+    x = zeros(0)
+    n = zeros(0)
+    p = zeros(0)
+    Ec = zeros(0)
+    Ev = zeros(0)
+    EFn = zeros(0)
+    EFp = zeros(0)
 
-    xq = xq / (μm)
+    for ireg in 1:numberOfRegions
+        subg = subgrid(grid, [ireg])
 
-    # Find the interval containing xq
-    if xq <= x[1]
-        return Geh[1] * 1e6
-    elseif xq >= x[end]
-        return Geh[end] * 1e6
-    else
-        i = findfirst(i -> x[i] <= xq < x[i+1], 1:length(x)-1)
+        Ec0 = get_BEE(iphip, ireg, ctsys)
+        Ev0 = get_BEE(iphin, ireg, ctsys)
+        solpsi = view(solution[data.index_psi, :], subg)
+        solp = view(solution[iphip, :], subg)
+        soln = view(solution[iphin, :], subg)
 
-        if isnothing(i)
-            error("xq is out of bounds or data is not sorted.")
-        end
-        # Exponential interpolation: Geh(x) = Geh1 * exp(log(Geh2/Geh1) * (xq-x1)/(x2-x1))
-        x1, x2 = x[i], x[i+1]
-        G1, G2 = Geh[i], Geh[i+1]
-        return G1 * exp(log(G2/G1) * (xq - x1) / (x2 - x1)) * 1e6
+        append!(x, subg[Coordinates]')
+        append!(n, get_density(solution, ireg, ctsys, iphin))
+        append!(p, get_density(solution, ireg, ctsys, iphip))
+        append!(Ec, Ec0 ./ q .- solpsi)
+        append!(Ev, Ev0 ./ q .- solpsi)
+        append!(EFn, -soln)
+        append!(EFp, -solp)
     end
+
+    # Build DataFrame
+    df = DataFrame(
+        x = x,
+        n = n,
+        p = p,
+        Ec = Ec,
+        Ev = Ev,
+        EFn = EFn,
+        EFp = EFp
+    )
+
+    CSV.write(filename, df)
 end
 
 function save_iv(filename::String, biasValues, IV)
