@@ -100,7 +100,7 @@ function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
         #parameter_file = "../parameter_files/Params_PSC_TiO2_MAPI_spiro.jl", # choose the parameter file
-        parameter_file = "../params/Params_Si_TOPCON.jl", # choose the parameter file
+        parameter_file = "../params/Params_Si_TOPCON.jl",
     )
 
     if plotting
@@ -120,7 +120,7 @@ function main(;
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s
-    ntsteps = 91
+    ntsteps = 151
     vend = voltageAcceptor # bias goes until the given voltage at acceptor boundary
     tend = vend / scanrate
 
@@ -411,7 +411,7 @@ function main(;
     ## for saving I-V data
     IV = zeros(0) # for IV values
     biasValues = zeros(0) # for bias values
-    VocExceeded = false # flag for Voc exceeded
+    VocExceeded = [false, false] # first term for if scaps Voc exceeded, second for if current < 0
 
     for istep in 2:ntsteps
 
@@ -432,8 +432,13 @@ function main(;
         ## get I-V data
         current = get_current_val(ctsys, solution, inival, Δt)
 
-        if current < 0.0 && VocExceeded == false
-            VocExceeded = true
+        if Δu >= 0.7400 && VocExceeded[1] == false
+            VocExceeded[1] = true
+            save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
+        end
+
+        if current < 0.0 && VocExceeded[2] == false
+            VocExceeded[2] = true
             # Plot bands and carrier densities at Voc
             PyPlot.rc("figure", figsize=(18, 8))
             fig = Plotter.figure()
@@ -446,6 +451,7 @@ function main(;
             plot_densities(Plotter, ctsys, solution, "Carrier Densities", label_density, clear=false)
 
             save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-oc.csv", solution, ctsys)
+            println("Voc = $(Δu)V")
 
             fig.tight_layout()
             Plotter.show()
@@ -478,4 +484,4 @@ function main(;
 end
 
 # DEBUG
-main(n = 40, verbose = true)
+main(n = 40, verbose = false)
