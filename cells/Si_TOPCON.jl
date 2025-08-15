@@ -229,7 +229,7 @@ function main(;
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
 
-    save_device_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
+    save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
 
     if plotting == true && toPlot["dark-sc"]
         ################################################################################
@@ -273,7 +273,7 @@ function main(;
         Plotter.show()
     end
 
-    # save_device_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
+    # save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
 
     if test == false
         println("*** done\n")
@@ -310,7 +310,7 @@ function main(;
 
         if Δu >= 0.7400 && VocExceeded[1] == false
             VocExceeded[1] = true
-            # save_device_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
+            # save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
         end
 
         if current < 0.0 && VocExceeded[2] == false
@@ -327,7 +327,7 @@ function main(;
                 Plotter.subplot(1, 2, 2)
                 plot_densities(Plotter, ctsys, solution, "Carrier Densities", label_density, clear=false)
 
-                # save_device_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-oc.csv", solution, ctsys)
+                # save_cell_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-oc.csv", solution, ctsys)
                 println("Voc = $(Δu)V")
 
                 fig.tight_layout()

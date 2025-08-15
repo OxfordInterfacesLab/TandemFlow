@@ -2,7 +2,7 @@ using DataFrames
 using CSV
 using PyPlot
 
-mutable struct CellProfile
+struct CellProfile
     x::Vector{Float64}      # position in μm
     n::Vector{Float64}      # electron density in /cm3
     p::Vector{Float64}      # hole density in /cm3
@@ -12,6 +12,7 @@ mutable struct CellProfile
     Efp::Vector{Float64}    # hole quasi-Fermi level in eV
     IV::Matrix{Float64}     # IV curve data
 
+    # constructor for if the cell profile is not given an IV measurement
     function CellProfile(x::Vector{Float64}, n::Vector{Float64}, p::Vector{Float64}, Ec::Vector{Float64}, Ev::Vector{Float64}, Efn::Vector{Float64}, Efp::Vector{Float64})
         IV = zeros(2, 1)
 
@@ -24,6 +25,11 @@ mutable struct CellProfile
 
         new(x, n, p, Ec, Ev, Efn, Efp, IV)
     end
+
+    # constructor for if the cell profile is only given an IV measurement
+    function CellProfile(IV::Matrix{Float64})
+        new(zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), zeros(0), IV)
+    end
 end
 
 struct GenerationProfile
@@ -33,8 +39,6 @@ end
 
 #######################################
 ########## FILE CONVERSIONS ###########
-
-
 """
 This function converts the tables in SCAPS files to DataFrames.
 DO NOT CALL THIS FUNCTION DIRECTLY
@@ -132,7 +136,7 @@ function parse_scaps(filename::String)
 end
 
 """
-Convert a ChargeTransport file to a cell profile - only works for band diagrams and carrier densities
+Convert a ChargeTransport file to a cell profile - not currently set for IV curves
 """
 function ct_to_profile(filename::String)
     df = CSV.read(filename, DataFrame)
