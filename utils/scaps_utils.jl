@@ -2,7 +2,9 @@ using DataFrames
 using CSV
 using PyPlot
 
-struct CellProfile
+# TODO: Need to fix units on this
+
+mutable struct CellProfile
     x::Vector{Float64}      # position in μm
     n::Vector{Float64}      # electron density in /cm3
     p::Vector{Float64}      # hole density in /cm3
@@ -11,6 +13,10 @@ struct CellProfile
     Efn::Vector{Float64}    # electron quasi-Fermi level in eV
     Efp::Vector{Float64}    # hole quasi-Fermi level in eV
     IV::Matrix{Float64}     # IV curve data
+
+    # TODO: Write a better constructor
+    has_profile::Bool
+    has_IV::Bool
 
     # constructor for if the cell profile is not given an IV measurement
     function CellProfile(x::Vector{Float64}, n::Vector{Float64}, p::Vector{Float64}, Ec::Vector{Float64}, Ev::Vector{Float64}, Efn::Vector{Float64}, Efp::Vector{Float64})
@@ -33,8 +39,8 @@ struct CellProfile
 end
 
 struct GenerationProfile
-    x::Vector{Float64}      # position in μm
-    G::Vector{Float64}    # generation rate in /cm3.s
+    x::Vector{Float64}      # position in m
+    G::Vector{Float64}    # generation rate in m^-3 s^-1
 end
 
 #######################################
@@ -114,8 +120,8 @@ function parse_scaps(filename::String)
         df = table_to_dataframe(lines[(gen_idx+1):end])
 
         profile = GenerationProfile(
-            df[!, "x (um)"],
-            df[!, "Geh (#/cm3.s)"]
+            df[!, "x (um)"] .* 1e-6, # convert from μm to m
+            df[!, "Geh (#/cm3.s)"] .* 1e6 # convert from cm^-3 s^-1
         )
 
         return profile
@@ -128,11 +134,38 @@ function parse_scaps(filename::String)
         end
         
         df = table_to_dataframe(lines[(start_idx+1):(end_idx-1)])
+
+        IV_matrix = [df[!, "v(V)"];; df[!, "jtot(mA/cm2)"]]
+        
+        return IV_matrix
     else
         throw(ArgumentError("scaps_to_df() doesn't support this file format: $filename"))
     end
 
     return profile
+end
+
+function set_IV!(profile::CellProfile, IV::Matrix{Float64})
+    if size(IV, 1) != 2
+        throw(ArgumentError("IV matrix must have 2 rows: [voltage; current density]"))
+    end
+
+    if size(IV, 2) < 1
+        throw(ArgumentError("IV matrix must have at least one column"))
+    end
+
+    profile.IV = IV
+end
+
+function set_IV!(profile::CellProfile, filename::String)
+    if endswith(filename, ".iv")
+        IV = parse_scaps(filename)
+    elseif endswith(filename, ".csv")
+        IV_df = CSV.read(filename, DataFrame)
+        IV = [IV_df[!, "V"];; IV_df[!, "J"]]
+    end
+
+    profile.IV = IV
 end
 
 """
@@ -261,8 +294,8 @@ Plots IV curves from SCAPS and ChargeTransport
 function compare_iv(profile_ct::CellProfile, profile_scaps::DataFrame)
     # Plotting IV curves
     figure(figsize=(10, 6))
-    plot(profile_ct.IV[1], profile_ct.IV[2], label="CT", color="blue")
-    plot(profile_scaps.IV[1], profile_scaps.IV[2], label="SCAPS", color="red", linestyle="--")
+    plot(profile_ct.IV[:, 1], profile_ct.IV[:, 2], label="CT", color="blue")
+    plot(profile_scaps.IV[:, 1], profile_scaps.IV[:, 2], label="SCAPS", color="red", linestyle="--")
 
     xlabel("Voltage (V)")
     ylabel("Current Density (mA/cm2)")
@@ -281,23 +314,29 @@ end
 ##################################
 ########### GENERATION ###########
 
-function generation_from_scaps(filename::String)
-    profile = parse_scaps(filename)
-
+"""
+Generates a function to get the generation rate from a SCAPS generation profile
+"""
+function generation_from_scaps(profile::GenerationProfile)
     return function(x::Float64)
-        x = x / (μm)
         if x <= profile.x[1]
-            return profile.G[1] * 1e6
+            return profile.G[1]
         elseif x >= profile.x[end]
-            return profile.G[end] * 1e6
+            return profile.G[end]
         else
             i = findfirst(i -> profile.x[i] <= x < profile.x[i+1], 1:length(profile.x)-1)
             if isnothing(i)
-                error("x is out of bounds or data is not sorted.")
+                error("x is out of bound s or data is not sorted.")
             end
             x1, x2 = profile.x[i], profile.x[i+1]
             G1, G2 = profile.G[i], profile.G[i+1]
-            return G1 * exp(log(G2/G1) * (x - x1) / (x2 - x1)) * 1e6
+            return G1 * exp(log(G2/G1) * (x - x1) / (x2 - x1))
         end
     end
+end
+
+function generation_from_scaps(filename::String)
+    profile = parse_scaps(filename)
+
+    generation_from_scaps(profile)
 end

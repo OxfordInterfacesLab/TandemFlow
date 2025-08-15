@@ -20,8 +20,10 @@ PyPlot.rc("ytick", labelsize=12)
 PyPlot.rc("legend", fontsize=12)
 ENV["MPLBACKEND"] = "qt5agg"
 
+# Modify this dictionary to choose what to plot
 toPlot = Dict(
     "grid" => false,
+    "generation" => false,
     "dark-sc" => false,
     "light-sc" => false,
     "light-oc" => false,
@@ -110,9 +112,10 @@ function main(;
     generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
 
     gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
-    gen2 = zeros(length(subg2[Coordinates]) - 1) # set absorption in poly layer to zero
+    # gen2 = zeros(length(subg2[Coordinates]) - 1) # set absorption in poly layer to zero
+    gen2 = generation_rate.(subg2[Coordinates]) # initialize generation in poly-Si layer
 
-    generationData = [gen1; gen2]
+    generationData = [gen1'; gen2']
 
     ## Initialize Data instance and fill in data
     data = Data(grid, numberOfCarriers, generationData = generationData)
@@ -179,8 +182,8 @@ function main(;
 
     # Schottky Barrier
     # TODO: just picked these values - need to justify
-    params.SchottkyBarrier[bregionCz] = 1.10 * (eV)
-    params.SchottkyBarrier[bregionPoly] = 0.0 * (eV)
+    params.SchottkyBarrier[bregionCz] = 1.105 * (eV)
+    params.SchottkyBarrier[bregionPoly] = -0.018 * (eV)
 
     params.bVelocity[iphin, bregionCz] = 1.0e-2 * cm/s
     params.bVelocity[iphip, bregionCz] = 1.0e7 * cm/s
@@ -213,8 +216,8 @@ function main(;
     control = SolverControl()
     control.verbose = verbose
     control.maxiters = 1000
-    control.damp_initial = 0.5
-    control.damp_growth = 1.51 # >= 1
+    control.damp_initial = 0.3
+    control.damp_growth = 1.11 # >= 1
 
     if test == false
         println("*** done\n")
@@ -231,19 +234,9 @@ function main(;
 
     save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
 
-    if plotting == true && toPlot["dark-sc"]
-        ################################################################################
-        println("Plot electroneutral potential, band-edge energies and doping")
-        ################################################################################
-        label_solution, label_density, label_energy, label_BEE = set_plotting_labels(data)
-
-        # Plot dark equilibrium
-        Plotter.figure()
-        plot_energies(Plotter, ctsys, solution, "Equilibrium, Dark", label_energy)
-        Plotter.figure()
-        plot_densities(Plotter, ctsys, solution, "Equilibrium, Dark", label_density)
-        Plotter.show()
-    end
+    ipsi = ctsys.fvmsys.physics.data.index_psi
+    Vbi = solution[ipsi, end] - solution[ipsi, 1]
+    println("\nBuilt-in Voltage: $(Vbi)V\n")
 
     ### D: ILLUMINATION
 
@@ -273,7 +266,7 @@ function main(;
         Plotter.show()
     end
 
-    # save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
+    save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
 
     if test == false
         println("*** done\n")
@@ -310,12 +303,15 @@ function main(;
 
         if Δu >= 0.7400 && VocExceeded[1] == false
             VocExceeded[1] = true
-            # save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
+            save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
         end
 
         if current < 0.0 && VocExceeded[2] == false
             VocExceeded[2] = true
             # Plot bands and carrier densities at Voc
+            save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-ct-oc.csv", solution, ctsys)
+            println("Graph plotted at V = $(Δu)")
+
             if plotting && toPlot["light-oc"]
                 PyPlot.rc("figure", figsize=(18, 8))
                 fig = Plotter.figure()
@@ -326,9 +322,6 @@ function main(;
                 plot_energies(Plotter, ctsys, solution, "Band Diagram", label_energy, clear=false)
                 Plotter.subplot(1, 2, 2)
                 plot_densities(Plotter, ctsys, solution, "Carrier Densities", label_density, clear=false)
-
-                # save_cell_profile_csv("simulation_data/chargetransport/si-topcon-schottky-illuminated-oc.csv", solution, ctsys)
-                println("Voc = $(Δu)V")
 
                 fig.tight_layout()
                 Plotter.show()

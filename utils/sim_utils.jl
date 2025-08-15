@@ -1,4 +1,5 @@
 using ChargeTransport
+using ExtendableGrids
 using DataFrames
 using CSV
 using PyPlot
@@ -30,9 +31,15 @@ end
 """
 Save the cell profile to a CSV file.
 """
-function save_cell_profile(filename, solution, ctsys)
-    grid = ctsys.fvmsys.grid # extract grid
-    data = ctsys.fvmsys.physics.data # extract data
+
+#TODO: Add ion functionality
+function save_cell_profile(filename, solution, ctsys, ions=false)
+    grid = ctsys.fvmsys.grid
+    data = ctsys.fvmsys.physics.data
+    numberOfRegions = grid[NumCellRegions]
+
+    iphin = data.bulkRecombination.iphin
+    iphip = data.bulkRecombination.iphip
 
     x = zeros(0)
     n = zeros(0)
@@ -45,8 +52,8 @@ function save_cell_profile(filename, solution, ctsys)
     for ireg in 1:numberOfRegions
         subg = subgrid(grid, [ireg])
 
-        Ec0 = get_BEE(iphip, ireg, ctsys) # short-circuit conduction band edge
-        Ev0 = get_BEE(iphin, ireg, ctsys) # short-circuit valence band edge
+        Ec0 = get_BEE(iphin, ireg, ctsys) # short-circuit conduction band edge
+        Ev0 = get_BEE(iphip, ireg, ctsys) # short-circuit valence band edge
         solpsi = view(solution[data.index_psi, :], subg) # electrical potential
         solp = view(solution[iphip, :], subg) # quasi-Fermi potential for holes
         soln = view(solution[iphin, :], subg) # quasi-Fermi potential for electrons
