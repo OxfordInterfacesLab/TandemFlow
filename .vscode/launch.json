@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "julia",
+            "request": "launch",
+            "name": "Debug Si_PERC.jl",
+            "program": "${workspaceFolder}/cells/Si_PERC.jl",
+            "stopOnEntry": false,
+            "juliaEnv": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}",
+            "internalConsoleOptions": "neverOpen",
+            "showWarnings": false,
+            "args": [],
+            "env": {}
+        }
+    ]
+}
