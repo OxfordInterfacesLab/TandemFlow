@@ -1,9 +1,24 @@
+using ChargeTransport
+using ExtendableGrids
 using DataFrames
 using CSV
 using PyPlot
 
-# TODO: Need to fix units on this
+# ----------------------------------------------------
+#                    DEFINE STRUCTS
+# ----------------------------------------------------
 
+"""
+A struct for an IV curve
+"""
+struct IV
+    biasValues::Vector{Float64}  # Voltage in V
+    current_density::Vector{Float64}  # Current density in mA/cm2
+end
+
+"""
+A mutable struct for a cell profile
+"""
 mutable struct CellProfile
     x::Vector{Float64}      # position in μm
     n::Vector{Float64}      # electron density in /cm3
@@ -38,13 +53,125 @@ mutable struct CellProfile
     end
 end
 
+"""
+A struct for generation profiles
+"""
 struct GenerationProfile
     x::Vector{Float64}      # position in m
     G::Vector{Float64}    # generation rate in m^-3 s^-1
+end 
+
+# ----------------------------------------------------
+#                    SIM UTILITIES
+# ----------------------------------------------------
+
+"""
+tanh function for error function-esque diffusion profile
+
+Profile drops from ymax to ymin between x0 and x1
+"""
+function tanh_diffusion_profile(x; x0=0.0, x1=10.0, ymin=0.0, ymax=1.0, sharpness=8.0)
+    x1 <= x0 && throw(ArgumentError("require x1 > x0"))
+
+    if x <= x0
+        return ymax
+    elseif x >= x1
+        return ymin
+    else
+        k   = sharpness / (x1 - x0)
+        mid = (x0 + x1)/2
+        t = (tanh(k*(mid - x)) + 1) / 2
+        return ymin + (ymax - ymin) * t
+    end
+
 end
 
-#######################################
-########## FILE CONVERSIONS ###########
+"""
+Save the cell profile to a CSV file.
+"""
+
+#TODO: Add ion functionality
+function save_cell_profile(filename, solution, ctsys, ions=false)
+    grid = ctsys.fvmsys.grid
+    data = ctsys.fvmsys.physics.data
+    numberOfRegions = grid[NumCellRegions]
+
+    iphin = data.bulkRecombination.iphin
+    iphip = data.bulkRecombination.iphip
+
+    x = zeros(0)
+    n = zeros(0)
+    p = zeros(0)
+    Ec = zeros(0)
+    Ev = zeros(0)
+    EFn = zeros(0)
+    EFp = zeros(0)
+
+    for ireg in 1:numberOfRegions
+        subg = subgrid(grid, [ireg])
+
+        Ec0 = get_BEE(iphin, ireg, ctsys) # short-circuit conduction band edge
+        Ev0 = get_BEE(iphip, ireg, ctsys) # short-circuit valence band edge
+        solpsi = view(solution[data.index_psi, :], subg) # electrical potential
+        solp = view(solution[iphip, :], subg) # quasi-Fermi potential for holes
+        soln = view(solution[iphin, :], subg) # quasi-Fermi potential for electrons
+
+        append!(x, subg[Coordinates]')
+        append!(n, get_density(solution, ireg, ctsys, iphin))
+        append!(p, get_density(solution, ireg, ctsys, iphip))
+        append!(Ec, Ec0 ./ q .- solpsi)
+        append!(Ev, Ev0 ./ q .- solpsi)
+        append!(EFn, -soln)
+        append!(EFp, -solp)
+    end
+
+    # Build DataFrame
+    df = DataFrame(
+        x = x,
+        n = n,
+        p = p,
+        Ec = Ec,
+        Ev = Ev,
+        EFn = EFn,
+        EFp = EFp
+    )
+
+    CSV.write(filename, df)
+end
+
+function save_iv(filename::String, biasValues, IV)
+    df = DataFrame(
+        V = biasValues,
+        J = IV
+    )
+
+    CSV.write(filename, df)
+end
+
+function get_cell_characteristics(IV::IV)
+    biasValues = IV.biasValues
+    currents = IV.current_density
+
+    powerDensity = biasValues .* (currents)
+    MaxPD, indexPD = findmax(powerDensity)
+
+    Voc = compute_open_circuit_voltage(biasValues, currents)
+
+    fillfactor = (biasValues[indexPD] * currents[indexPD]) / (currents[1] * Voc)
+
+    characteristics = Dict(
+        "Voc" => Voc,
+        "Pmax" => MaxPD,
+        "FF" => fillfactor,
+    )
+
+    return characteristics
+end
+
+# ----------------------------------------------------
+#                    SCAPS UTILITIES
+# ----------------------------------------------------
+
 """
 This function converts the tables in SCAPS files to DataFrames.
 DO NOT CALL THIS FUNCTION DIRECTLY
@@ -310,9 +437,6 @@ function compare_iv(filename_ct::String, filename_scaps::String)
 
     compare_iv(profile_ct, profile_scaps)
 end
-
-##################################
-########### GENERATION ###########
 
 """
 Generates a function to get the generation rate from a SCAPS generation profile

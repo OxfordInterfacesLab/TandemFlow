@@ -1,3 +1,11 @@
+#=
+
+Code for simulation of a Silicon solar cell with a TOPCon structure.
+
+=#
+
+module Si_TOPCON
+
 using ChargeTransport
 using ExtendableGrids
 using PyPlot
@@ -100,7 +108,7 @@ function main(;
     bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # junction
 
     ## Plot node grid
-    if toPlot["grid"]
+    if plotting && toPlot["grid"]
         gridplot(grid, Plotter = Plotter, legend = :lt)
         Plotter.title("Grid")
         Plotter.show()
@@ -230,20 +238,12 @@ function main(;
     control.damp_initial = 0.3
     control.damp_growth = 1.11 # >= 1
 
-    if test == false
-        println("*** done\n")
-    end
-
-    ################################################################################
-    if test == false
-        println("Compute solution in thermodynamic equilibrium")
-    end
-    ################################################################################
+    println("--- Solve in equilibrium ---")
 
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
 
-    save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
+    #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
 
     ipsi = ctsys.fvmsys.physics.data.index_psi
     Vbi = solution[ipsi, end] - solution[ipsi, 1]
@@ -277,17 +277,9 @@ function main(;
         Plotter.show()
     end
 
-    save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
+    #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
 
-    if test == false
-        println("*** done\n")
-    end
-
-    ################################################################################
-    if test == false
-        println("I-V Measurement Loop")
-    end
-    ################################################################################
+    println("--- IV Curve ---")
 
     ## for saving I-V data
     IV = zeros(0) # for IV values
@@ -335,13 +327,13 @@ function main(;
 
         if Δu >= 0.7400 && VocExceeded[1] == false
             VocExceeded[1] = true
-            save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
+            #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
         end
 
         if current < 0.0 && VocExceeded[2] == false
             VocExceeded[2] = true
             # Plot bands and carrier densities at Voc
-            save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-ct-oc.csv", solution, ctsys)
+            #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-ct-oc.csv", solution, ctsys)
             println("Graph plotted at V = $(Δu)")
 
             if plotting && toPlot["light-oc"]
@@ -372,21 +364,7 @@ function main(;
     
     save_iv("simulation_data/chargetransport/si-topcon-schottky-iv.csv", biasValues, IV)
 
-    powerDensity = biasValues .* (IV)           # power density function
-    MaxPD, indexPD = findmax(powerDensity)
-
-    Voc = compute_open_circuit_voltage(biasValues, IV)
-
-    IncidentLightPowerDensity = 1000.0 * W / m^2
-
-    efficiency = MaxPD / IncidentLightPowerDensity
-    fillfactor = (biasValues[indexPD] * IV[indexPD]) / (IV[1] * Voc)
-
-    println("\nIsc = $(IV[1])")
-    println("Voc = $(Voc)")
-    println("FF = $(fillfactor)")
-    println("PCE = $(efficiency)")
+    return IV(biasValues, IV)
 end
 
-# DEBUG
-main(n = 12, verbose = false)
+end
