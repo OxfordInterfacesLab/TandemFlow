@@ -26,6 +26,7 @@ toPlot = Dict(
     "generation" => false,
     "dark-sc" => false,
     "light-sc" => false,
+    "light-bias" => true,
     "light-oc" => false,
     "iv" => false
 )
@@ -126,7 +127,7 @@ function main(;
 
     data.bulkRecombination = set_bulk_recombination(;
         iphin = iphin, iphip = iphip,
-        bulk_recomb_Auger = false,
+        bulk_recomb_Auger = true,
         bulk_recomb_radiative = true,
         bulk_recomb_SRH = true
     )
@@ -170,6 +171,9 @@ function main(;
 
         params.recombinationSRHTrapDensity[iphin, ireg] = 1.0e14 / (m^3)
         params.recombinationSRHTrapDensity[iphip, ireg] = 1.0e14 / (m^3)
+
+        params.recombinationAuger[iphin, ireg] = Augn[ireg]
+        params.recombinationAuger[iphip, ireg] = Augp[ireg]
     end
 
     ##############################################################
@@ -208,6 +212,10 @@ function main(;
 
     data.params = params
     data.paramsnodal = paramsnodal
+
+    if plotting
+        label_solution, label_density, label_energy, label_BEE = set_plotting_labels(data)
+    end
 
     ctsys = System(grid, data, unknown_storage = :sparse)
 
@@ -283,6 +291,11 @@ function main(;
     biasValues = zeros(0) # for bias values
     VocExceeded = [false, false] # first term for if scaps Voc exceeded, second for if current < 0
 
+    if toPlot["light-bias"]
+        Plotter.rc("figure", figsize=(18, 8))
+        fig = Plotter.figure()
+    end
+    figure = Plotter.figure()
     for istep in 2:ntsteps
         t = tvalues[istep]       # Actual time
         Δu = t * scanrate         # Applied voltage
@@ -301,6 +314,22 @@ function main(;
         ## get I-V data
         current = get_current_val(ctsys, solution, inival, Δt)
 
+
+        if plotting && toPlot["light-bias"]
+            Plotter.clf()
+            
+            fig.suptitle("Illuminated, Bias = $(round(Δu, digits=2))", fontsize=16)
+
+            Plotter.subplot(1, 2, 1)
+            plot_energies(Plotter, ctsys, solution, "Band Diagram", label_energy, clear=false)
+            Plotter.subplot(1, 2, 2)
+            plot_densities(Plotter, ctsys, solution, "Carrier Densities", label_density, clear=false)
+
+            fig.tight_layout()
+            Plotter.pause(0.1)
+            display(gcf())
+        end
+
         if Δu >= 0.7400 && VocExceeded[1] == false
             VocExceeded[1] = true
             save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
@@ -313,7 +342,7 @@ function main(;
             println("Graph plotted at V = $(Δu)")
 
             if plotting && toPlot["light-oc"]
-                PyPlot.rc("figure", figsize=(18, 8))
+                Plotter.rc("figure", figsize=(18, 8))
                 fig = Plotter.figure()
 
                 fig.suptitle("Illuminated, Bias = $(round(Δu, digits=2))", fontsize=16)
@@ -357,4 +386,4 @@ function main(;
 end
 
 # DEBUG
-main(n = 40, verbose = false)
+main(n = 12, verbose = false)

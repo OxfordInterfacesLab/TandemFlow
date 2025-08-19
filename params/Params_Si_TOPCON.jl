@@ -53,6 +53,10 @@ Np = [1.04e25, 1.0e26] ./ (m^3)
 ## radiative recombination
 r0 = [4.22e-15, 4.22e-15] .* (cm^3) / (s)
 
+## auger recombination
+Augn = [6.0e-30, 7.02e-31] .* (cm^6) / (s)
+Augp = [9.0e-31, 3.5e-30] .* (cm^6) / (s)
+
 ## life times and trap densities
 τcz = [1.0, 1.0] .* s  # a-Si (minority), Cz-Si, a-Si (minority)
 τpoly = [1.0, 1.0] .* s  # a-Si (majority), Cz-Si, a-Si (majority)
