@@ -4,6 +4,7 @@ using PyPlot
 using CSV
 using DataFrames
 
+# import utilities
 include("../utils/ct_utils.jl")
 using .CTUtils
 
@@ -31,6 +32,7 @@ toPlot = Dict(
     "iv" => false
 )
 
+# simulation function
 function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
@@ -113,7 +115,6 @@ function main(;
     generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
 
     gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
-    # gen2 = zeros(length(subg2[Coordinates]) - 1) # set absorption in poly layer to zero
     gen2 = generation_rate.(subg2[Coordinates]) # initialize generation in poly-Si layer
 
     generationData = [gen1'; gen2']
@@ -125,6 +126,7 @@ function main(;
     carrier_stats = Boltzmann # TODO: choices
     data.F = [carrier_stats, carrier_stats]
 
+    # set simulated recombination mechanisms
     data.bulkRecombination = set_bulk_recombination(;
         iphin = iphin, iphip = iphip,
         bulk_recomb_Auger = true,
@@ -132,8 +134,10 @@ function main(;
         bulk_recomb_SRH = true
     )
 
+    # set generation model as defined above
     data.generationModel = GenerationUserDefined
 
+    # set interface types
     data.boundaryType[bregionPoly] = SchottkyContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
     data.boundaryType[bregionCz] = SchottkyContact
@@ -151,7 +155,6 @@ function main(;
     params.chargeNumbers[iphip] = zp
 
     for ireg in 1:numberOfRegions ## interior region data
-
         params.dielectricConstant[ireg] = ε[ireg] * ε0
 
         ## effective dos, band edge energy and mobilities
@@ -185,7 +188,7 @@ function main(;
     params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionPoly]
 
     # Schottky Barrier
-    # TODO: just picked these values - need to justify
+    # TODO: These values were picked based on SCAPS calculations
     params.SchottkyBarrier[bregionCz] = 1.105 * (eV)
     params.SchottkyBarrier[bregionPoly] = -0.018 * (eV)
 

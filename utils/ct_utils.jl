@@ -1,7 +1,7 @@
 module CTUtils
 
 ## Helper functions for simulations
-export generation_from_scaps, scaps_to_df_generation
+export generation_from_scaps
 export save_cell_profile, save_iv
 export tanh_diffusion_profile
 
