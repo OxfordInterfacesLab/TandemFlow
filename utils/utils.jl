@@ -148,7 +148,7 @@ function save_iv(filename::String, biasValues, IV)
     CSV.write(filename, df)
 end
 
-function get_cell_characteristics(IV::IV)
+function get_cell_characteristics(IV)
     biasValues = IV.biasValues
     currents = IV.current_density
 
@@ -160,6 +160,7 @@ function get_cell_characteristics(IV::IV)
     fillfactor = (biasValues[indexPD] * currents[indexPD]) / (currents[1] * Voc)
 
     characteristics = Dict(
+        "Jsc" => currents[1],
         "Voc" => Voc,
         "Pmax" => MaxPD,
         "FF" => fillfactor,

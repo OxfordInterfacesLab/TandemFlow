@@ -46,6 +46,7 @@ function main(;
         verbose = false, test = false,
         #parameter_file = "../parameter_files/Params_PSC_TiO2_MAPI_spiro.jl", # choose the parameter file
         parameter_file = "../params/Params_Si_TOPCON.jl",
+        generation_file = "../generation/si-topcon-auto.gen"
     )
 
     if plotting
@@ -119,7 +120,6 @@ function main(;
     ## set up generation data
     subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
 
-    generation_file = "simulation_data/scaps/si-topcon-auto.gen"
     generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
 
     gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
@@ -282,7 +282,7 @@ function main(;
     println("--- IV Curve ---")
 
     ## for saving I-V data
-    IV = zeros(0) # for IV values
+    currents = zeros(0) # for IV values
     biasValues = zeros(0) # for bias values
     VocExceeded = [false, false] # first term for if scaps Voc exceeded, second for if current < 0
 
@@ -352,19 +352,19 @@ function main(;
             end
         end
 
-        push!(IV, current)
+        push!(currents, current)
         push!(biasValues, Δu)
     end # time loop
 
     # Plot IV curve
     if plotting && toPlot["iv"]
-        plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(maxVoltage)")
+        plot_IV(Plotter, biasValues, -currents, "bias \$\\Delta u\$ = $(maxVoltage)")
         show()
     end
     
-    save_iv("simulation_data/chargetransport/si-topcon-schottky-iv.csv", biasValues, IV)
+    # save_iv("simulation_data/chargetransport/si-topcon-schottky-iv.csv", biasValues, IV)
 
-    return IV(biasValues, IV)
+    return IV(biasValues, currents)
 end
 
 end
