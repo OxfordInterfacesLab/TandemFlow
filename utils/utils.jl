@@ -5,7 +5,7 @@ using CSV
 using PyPlot
 
 # ----------------------------------------------------
-#                    DEFINE STRUCTS
+#                      STRUCTS
 # ----------------------------------------------------
 
 """
@@ -13,7 +13,7 @@ A struct for an IV curve
 """
 struct IV
     biasValues::Vector{Float64}  # Voltage in V
-    current_density::Vector{Float64}  # Current density in mA/cm2
+    current_densities::Vector{Float64}  # Current density in mA/cm2
 end
 
 """
@@ -150,7 +150,11 @@ end
 
 function get_cell_characteristics(IV)
     biasValues = IV.biasValues
-    currents = IV.current_density
+    currents = IV.current_densities
+
+    if currents[1] < 0
+        currents = -currents  # make sure Jsc is positive
+    end
 
     powerDensity = biasValues .* (currents)
     MaxPD, indexPD = findmax(powerDensity)
@@ -162,7 +166,7 @@ function get_cell_characteristics(IV)
     characteristics = Dict(
         "Jsc" => currents[1],
         "Voc" => Voc,
-        "Pmax" => MaxPD,
+        "Pmax" => biasValues[indexPD] * currents[indexPD],
         "FF" => fillfactor,
     )
 

@@ -1,2 +1,5 @@
 # Ignore VS Code settings and workspace files
 .vscode/
+
+# Ignore any file with 'testing' in its name
+*testing*

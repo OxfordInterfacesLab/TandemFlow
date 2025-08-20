@@ -1,8 +1,12 @@
 #=
 
-Code for simulation of a Silicon solar cell with a TOPCon structure.
+Code for simulation of a Perovskite solar cell
+
+TODO: Add the ETL, HTL, and Absorber specs
 
 =#
+
+module PSC_2
 
 using ChargeTransport
 using ExtendableGrids
@@ -38,11 +42,16 @@ toPlot = Dict(
     "iv" => false
 )
 
+parameter_file = "../params/Params_PSC_C60_PVK_PTAA.jl"
+include(parameter_file)
+
 # you can also use other Plotters, if you add them to the example file
 function main(;
         n = 6, Plotter = PyPlot, plotting = false,
         verbose = false, test = false,
         parameter_file = "../params/Params_PSC_C60_PVK_PTAA.jl", # choose the parameter file
+        BeerLambertGeneration = true,
+        incidentPhotonFlux = 4.3e21 / (m^2 * s)
     )
 
     println("--- Define physical parameters and model ---")
@@ -50,7 +59,7 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    voltageAcceptor = 1.2 * V
+    voltageAcceptor = 1.5 * V
 
     ## primary data for I-V scan protocol
     scanrate = 1.0 * V / s
@@ -122,7 +131,7 @@ function main(;
 
     ## Possible choices: Boltzmann, FermiDiracOneHalfBednarczyk, FermiDiracOneHalfTeSCA,
     ## FermiDiracMinusOne, Blakemore
-    data.F = [FermiDiracOneHalfTeSCA, FermiDiracOneHalfTeSCA, FermiDiracMinusOne]
+    data.F = [Boltzmann, Boltzmann, FermiDiracMinusOne]
 
     data.bulkRecombination = set_bulk_recombination(;
         iphin = iphin, iphip = iphip,
@@ -130,6 +139,12 @@ function main(;
         bulk_recomb_radiative = true,
         bulk_recomb_SRH = true
     )
+
+    if !BeerLambertGeneration
+        data.generationModel = GenerationUniform
+    else
+        data.generationModel = GenerationBeerLambert
+    end
 
     ## Possible choices: OhmicContact, SchottkyContact (outer boundary) and InterfaceNone,
     ## InterfaceRecombination (inner boundary).
@@ -174,9 +189,16 @@ function main(;
         params.recombinationRadiative[ireg] = r0[ireg]
         params.recombinationSRHLifetime[iphin, ireg] = τn[ireg]
         params.recombinationSRHLifetime[iphip, ireg] = τp[ireg]
-        params.recombinationSRHTrapDensity[iphin, ireg] = trap_density!(iphin, ireg, params, EI[ireg])
-        params.recombinationSRHTrapDensity[iphip, ireg] = trap_density!(iphip, ireg, params, EI[ireg])
+
+        params.recombinationSRHTrapDensity[iphin, ireg] = nTrapDensity[ireg]
+        params.recombinationSRHTrapDensity[iphip, ireg] = pTrapDensity[ireg]
+
+        if BeerLambertGeneration
+            params.generationAbsorption[ireg] = absorption[ireg]
+        end
     end
+
+    params.generationIncidentPhotonFlux = [0.0, incidentPhotonFlux, 0.0]
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
@@ -219,8 +241,9 @@ function main(;
 
     control = SolverControl()
     control.verbose = verbose
-    control.damp_initial = 0.6
-    control.damp_growth = 1.31 # >= 1
+    control.damp_initial = 0.5
+    control.damp_growth = 1.21 # >= 1
+    control.maxiters = 1000
 
     println("--- Solve in equilibrium ---")
 
@@ -229,8 +252,11 @@ function main(;
 
     ### D: ILLUMINATION
 
-    I = collect(20:-0.2:0.0)
+    I = collect(20:-1:0.0)
     LAMBDA = 10 .^ (-I)
+
+    ctsys.fvmsys.boundary_factors[iphia, bregionJ2] = 1.0e30
+    ctsys.fvmsys.boundary_values[iphia, bregionJ2] = 0.0
 
     for istep in 1:(length(I) - 1)
 
@@ -247,6 +273,9 @@ function main(;
     end # generation loop
 
     println("--- IV Curve ---")
+
+    ctsys.fvmsys.boundary_factors[iphia, bregionJ2] = 0.0
+    ctsys.fvmsys.boundary_values[iphia, bregionJ2] = 0.0
 
     ## for saving I-V data
     currents = zeros(0) # for IV values
@@ -284,9 +313,8 @@ function main(;
         end
 
     end 
-
-    println("I-V scan finished.")
+s
     return IV(biasValues, currents)
 end
 
-main(n=6, plotting=false, verbose=false) # Debugging
+end

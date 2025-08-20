@@ -46,7 +46,9 @@ function main(;
         verbose = false, test = false,
         #parameter_file = "../parameter_files/Params_PSC_TiO2_MAPI_spiro.jl", # choose the parameter file
         parameter_file = "../params/Params_Si_TOPCON.jl",
-        generation_file = "../generation/si-topcon-auto.gen"
+        generation_file = "../generation/si-topcon-auto.gen",
+        BeerLambertGeneration = true,
+        incidentPhotonFlux = 4.3e21 / (m^2 * s)
     )
 
     if plotting
@@ -117,18 +119,20 @@ function main(;
 
     println("--- Define system and fill in information about model ---")
 
-    ## set up generation data
-    subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
+    if !BeerLambertGeneration
+        ## set up generation data
+        subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
 
-    generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
+        generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
 
-    gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
-    gen2 = generation_rate.(subg2[Coordinates]) # initialize generation in poly-Si layer
+        gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
+        gen2 = generation_rate.(subg2[Coordinates]) # initialize generation in poly-Si layer
 
-    generationData = [gen1'; gen2']
-
-    ## Initialize Data instance and fill in data
-    data = Data(grid, numberOfCarriers, generationData = generationData)
+        generationData = [gen1'; gen2']
+        data = Data(grid, numberOfCarriers, generationData = generationData) # Initialize Data instance and fill in data
+    else
+        data = Data(grid, numberOfCarriers)
+    end
 
     data.modelType = Transient # choices: Transient, Stationary
     carrier_stats = Boltzmann # TODO: choices
@@ -142,8 +146,13 @@ function main(;
         bulk_recomb_SRH = true
     )
 
-    # set generation model as defined above
-    data.generationModel = GenerationUserDefined
+    if BeerLambertGeneration
+        # set generation model
+        data.generationModel = GenerationBeerLambert
+    else
+        # set generation model
+        data.generationModel = GenerationUserDefined
+    end
 
     # set interface types
     data.boundaryType[bregionPoly] = SchottkyContact
@@ -185,7 +194,13 @@ function main(;
 
         params.recombinationAuger[iphin, ireg] = Augn[ireg]
         params.recombinationAuger[iphip, ireg] = Augp[ireg]
+
+        if BeerLambertGeneration
+            params.generationAbsorption[ireg] = absorption[ireg]
+        end
     end
+
+    params.generationIncidentPhotonFlux = [incidentPhotonFlux, 0.0]
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
