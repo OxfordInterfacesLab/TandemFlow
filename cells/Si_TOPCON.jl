@@ -35,9 +35,9 @@ toPlot = Dict(
     "generation" => false,
     "dark-sc" => false,
     "light-sc" => false,
-    "light-bias" => true,
+    "light-bias" => false,
     "light-oc" => false,
-    "iv" => false
+    "iv" => true
 )
 
 # simulation function
@@ -60,7 +60,7 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    maxVoltage = 0.95 * V
+    maxVoltage = 0.66 * V
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s

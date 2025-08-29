@@ -37,9 +37,9 @@ toPlot = Dict(
     "generation" => false,
     "dark-sc" => false,
     "light-sc" => false,
-    "light-bias" => true,
+    "light-bias" => false,
     "light-oc" => false,
-    "iv" => false
+    "iv" => true
 )
 
 parameter_file = "../params/Params_PSC_C60_PVK_PTAA.jl"
@@ -59,12 +59,12 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    voltageAcceptor = 1.5 * V
+    maxVoltage = 1.3 * V
 
     ## primary data for I-V scan protocol
-    scanrate = 1.0 * V / s
+    scanrate = 0.3 * V / s
     ntsteps = 91
-    tend = voltageAcceptor / scanrate
+    tend = maxVoltage / scanrate
 
     tvalues = range(0, stop = tend, length = ntsteps)
 
@@ -272,6 +272,18 @@ function main(;
 
     end # generation loop
 
+    if plotting && toPlot["light-sc"]
+        label_solution, label_density, label_energy, label_BEE = set_plotting_labels(data)
+        label_energy[1, iphia] = "\$E_a-q\\psi\$"; label_energy[2, iphia] = "\$ - q \\varphi_a\$"; label_BEE[iphia] = "\$E_a\$"
+        label_density[iphia] = "\$ n_a \$";      label_solution[iphia] = "\$ \\varphi_a\$"
+
+        Plotter.figure()
+        plot_energies(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_energy)
+        Plotter.figure()
+        plot_densities(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_density)
+        Plotter.show()
+    end
+
     println("--- IV Curve ---")
 
     ctsys.fvmsys.boundary_factors[iphia, bregionJ2] = 0.0
@@ -302,18 +314,15 @@ function main(;
 
         push!(currents, current)
         push!(biasValues, Δu)
-
-        if plotting
-            label_solution, label_density, label_energy = set_plotting_labels(data)
-            label_solution[iphia] = "\$ \\varphi_a\$"
-
-            Plotter.clf()
-            plot_solution(Plotter, ctsys, solution, "bias \$\\Delta u\$ = $(Δu)", label_solution)
-            Plotter.pause(0.5)
-        end
-
     end 
-s
+
+    currents = -currents
+
+    if plotting && toPlot["iv"]
+        plot_IV(Plotter, biasValues, -currents, "bias \$\\Delta u\$ = $(maxVoltage)")
+        show()
+    end
+
     return IV(biasValues, currents)
 end
 
