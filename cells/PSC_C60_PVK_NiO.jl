@@ -1,12 +1,9 @@
 #=
 
-Code for simulation of a Perovskite solar cell
-
-TODO: Add the ETL, HTL, and Absorber specs
 
 =#
 
-module PSC_2
+module PSC_3
 
 using ChargeTransport
 using ExtendableGrids
@@ -22,14 +19,14 @@ using .CTUtils
 toPlot = Dict(
     "grid" => false,
     "generation" => false,
-    "dark-sc" => false,
+    "dark-sc" => true,
     "light-sc" => false,
     "light-bias" => false,
     "light-oc" => false,
     "iv" => false
 )
 
-parameter_file = "../params/Params_PSC_C60_PVK_PTAA.jl"
+parameter_file = "../params/Params_PSC_C60_PVK_NiO.jl"
 include(parameter_file)
 
 function main(;
@@ -44,11 +41,11 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## max contact voltage during I-V scan
-    maxVoltage = 1.3 * V
+    maxVoltage = 1.0 * V
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s
-    ntsteps = 91 # number of time steps
+    ntsteps = 201 # number of time steps
     tend = maxVoltage / scanrate
 
     tvalues = range(0, stop = tend, length = ntsteps)
@@ -131,18 +128,18 @@ function main(;
 
     ## Beer-Lambert or uniform generation
     ## more complex generation models can be implemented via the user-defined generation model
-    if !BeerLambertGeneration
-        data.generationModel = GenerationUniform
-    else
-        data.generationModel = GenerationBeerLambert
-    end
+    # if !BeerLambertGeneration
+    #     data.generationModel = GenerationUniform
+    # else
+    #     data.generationModel = GenerationBeerLambert
+    # end
 
     ## set interface types
     ## possible choices: OhmicContact, SchottkyContact (outer boundary) and InterfaceNone,
     ## InterfaceRecombination (inner boundary).
     data.boundaryType[bregionAcceptor] = OhmicContact
-    data.boundaryType[bregionJ1] = InterfaceRecombination
-    data.boundaryType[bregionJ2] = InterfaceRecombination
+    # data.boundaryType[bregionJ1] = InterfaceRecombination
+    # data.boundaryType[bregionJ2] = InterfaceRecombination
     data.boundaryType[bregionDonor] = OhmicContact
 
     ## present ionic vacancies in perovskite layer
@@ -192,14 +189,14 @@ function main(;
         params.recombinationAuger[iphin, ireg] = Augn[ireg]
         params.recombinationAuger[iphip, ireg] = Augp[ireg]
 
-        if BeerLambertGeneration
-            params.generationAbsorption[ireg] = absorption[ireg]
-        end
+        # if BeerLambertGeneration
+        #     params.generationAbsorption[ireg] = absorption[ireg]
+        # end
     end
 
     ## set photon flux for each region
     ## assume only the absorber can absorb light, and CTLs are perfectly transparent
-    params.generationIncidentPhotonFlux = [0.0, incidentPhotonFlux, 0.0]
+    # params.generationIncidentPhotonFlux = [0.0, incidentPhotonFlux, 0.0]
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
@@ -215,25 +212,26 @@ function main(;
     params.bBandEdgeEnergy[iphin, bregionJ2] = En[regionIntrinsic]
     params.bBandEdgeEnergy[iphip, bregionJ2] = Ep[regionIntrinsic]
 
-    ## surface recombination velocities
-    params.recombinationSRHvelocity[iphin, bregionJ1] = 1.0e1 * cm / s
-    params.recombinationSRHvelocity[iphip, bregionJ1] = 1.0e5 * cm / s
+    ## surface recombination velocities - no recombination
+    # params.recombinationSRHvelocity[iphin, bregionJ1] = 1.0e1 * cm / s
+    # params.recombinationSRHvelocity[iphip, bregionJ1] = 1.0e5 * cm / s
 
-    params.recombinationSRHvelocity[iphin, bregionJ2] = 1.0e7 * cm / s
-    params.recombinationSRHvelocity[iphip, bregionJ2] = 1.0e1 * cm / s
+    # params.recombinationSRHvelocity[iphin, bregionJ2] = 1.0e7 * cm / s
+    # params.recombinationSRHvelocity[iphip, bregionJ2] = 1.0e1 * cm / s
 
-    ## set interface trap densities
-    params.bRecombinationSRHTrapDensity[iphin, bregionJ1] = params.recombinationSRHTrapDensity[iphin, regionIntrinsic]
-    params.bRecombinationSRHTrapDensity[iphip, bregionJ1] = params.recombinationSRHTrapDensity[iphip, regionIntrinsic]
+    ## set interface trap densities - no interface traps
+    # params.bRecombinationSRHTrapDensity[iphin, bregionJ1] = params.recombinationSRHTrapDensity[iphin, regionIntrinsic]
+    # params.bRecombinationSRHTrapDensity[iphip, bregionJ1] = params.recombinationSRHTrapDensity[iphip, regionIntrinsic]
 
-    params.bRecombinationSRHTrapDensity[iphin, bregionJ2] = params.recombinationSRHTrapDensity[iphin, regionIntrinsic]
-    params.bRecombinationSRHTrapDensity[iphip, bregionJ2] = params.recombinationSRHTrapDensity[iphip, regionIntrinsic]
+    # params.bRecombinationSRHTrapDensity[iphin, bregionJ2] = params.recombinationSRHTrapDensity[iphin, regionIntrinsic]
+    # params.bRecombinationSRHTrapDensity[iphip, bregionJ2] = params.recombinationSRHTrapDensity[iphip, regionIntrinsic]
 
     ##############################################################
 
     ## interior doping
     params.doping[iphin, regionDonor] = Cn # ETL doping
     params.doping[iphip, regionAcceptor] = Cp # HTL doping
+    params.doping[iphin, regionIntrinsic] = 1.0e20 / (m^3) # absorber n-doping
     params.doping[iphia, regionIntrinsic] = Ca # initial anion concentration
 
     data.params = params
@@ -244,8 +242,8 @@ function main(;
     ## solver parameters - tweak when convergence is an issue
     control = SolverControl()
     control.verbose = verbose
-    control.damp_initial = 0.5
-    control.damp_growth = 1.21 # >= 1
+    control.damp_initial = 0.3
+    control.damp_growth = 1.11 # >= 1
     control.maxiters = 1000
 
     println("--- Solve in equilibrium ---")
@@ -269,39 +267,41 @@ function main(;
         Plotter.show()
     end
 
-    ## array which defines light intensity at each step as we ramp up illumination
-    I = collect(20:-1:0.0)
-    LAMBDA = 10 .^ (-I)
+    # exit()
 
-    ## set Neumann boundary conditions for anions - otherwise simulation won't know what potential to put anions at
-    ctsys.fvmsys.boundary_factors[iphia, bregionJ2] = 1.0e30
-    ctsys.fvmsys.boundary_values[iphia, bregionJ2] = 0.0
+    # array which defines light intensity at each step as we ramp up illumination
+    # I = collect(20:-1:0.0)
+    # LAMBDA = 10 .^ (-I)
+
+    # ## set Neumann boundary conditions for anions - otherwise simulation won't know what potential to put anions at
+    # ctsys.fvmsys.boundary_factors[iphia, bregionJ2] = 1.0e30
+    # ctsys.fvmsys.boundary_values[iphia, bregionJ2] = 0.0
 
     ## ramp up light intensity
-    for istep in 1:(length(I) - 1)
-        ## ramp up generation
-        ctsys.data.λ2 = LAMBDA[istep + 1]
+    # for istep in 1:(length(I) - 1)
+    #     ## ramp up generation
+    #     ctsys.data.λ2 = LAMBDA[istep + 1]
 
-        println("increase generation with λ2 = $(data.λ2)")
+    #     println("increase generation with λ2 = $(data.λ2)")
 
-        solution = solve(ctsys, inival = inival, control = control)
-        inival = solution
-    end
+    #     solution = solve(ctsys, inival = inival, control = control)
+    #     inival = solution
+    # end
 
-    ## plot carrier densities and energies in short-circuit under illumination
-    if plotting && toPlot["light-sc"]
-        Plotter.figure()
-        plot_energies(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_energy)
-        Plotter.figure()
-        plot_densities(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_density)
-        Plotter.show()
-    end
+    # # plot carrier densities and energies in short-circuit under illumination
+    # if plotting && toPlot["light-sc"]
+    #     Plotter.figure()
+    #     plot_energies(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_energy)
+    #     Plotter.figure()
+    #     plot_densities(Plotter, ctsys, solution, "Illuminated Short-Circuit", label_density)
+    #     Plotter.show()
+    # end
 
     println("--- IV Curve ---")
 
-    ## turn off Neumann boundary conditions for anions
-    ctsys.fvmsys.boundary_factors[iphia, bregionJ2] = 0.0
-    ctsys.fvmsys.boundary_values[iphia, bregionJ2] = 0.0
+    # ## turn off Neumann boundary conditions for anions
+    # ctsys.fvmsys.boundary_factors[iphia, bregionJ2] = 0.0
+    # ctsys.fvmsys.boundary_values[iphia, bregionJ2] = 0.0
 
     ## for saving I-V data
     currents = zeros(0) # for current densities (A m^{-2})
@@ -314,7 +314,7 @@ function main(;
         Δt = t - tvalues[istep - 1] # Time step size
 
         ## Apply new voltage (set non-equilibrium values)
-        set_contact!(ctsys, bregionAcceptor, Δu = Δu)
+        set_contact!(ctsys, bregionDonor, Δu = Δu)
 
         println("time value: Δt = $(t), bias: Δu = $(Δu)")
 
@@ -330,6 +330,16 @@ function main(;
 
     ## flip currents - use this based on cell architecture
     currents = -currents
+
+    if plotting && toPlot["light-bias"]
+        Plotter.figure()
+        plot_energies(Plotter, ctsys, solution, "1V Reverse Bias", label_energy)
+        savefig("psc-1Vrb-bands.png")
+        Plotter.figure()
+        plot_densities(Plotter, ctsys, solution, "1V Reverse Bias", label_density)
+        savefig("psc-1Vrb-densities.png")
+        Plotter.show()
+    end
 
     ## plot IV curve
     if plotting && toPlot["iv"]

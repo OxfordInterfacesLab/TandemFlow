@@ -26,9 +26,9 @@ bregionJ1 = 3
 bregionJ2 = 4
 
 ## length domains
-h_ndoping = 30.0 * nm
-h_intrinsic = 400.0 * nm
-h_pdoping = 10.0 * nm
+h_ndoping = 20.0 * nm
+h_intrinsic = 100.0 * nm
+h_pdoping = 13.0 * nm
 h_total = h_ndoping + h_intrinsic + h_pdoping
 heightLayers = [
     h_ndoping,
@@ -46,38 +46,37 @@ za = 1
 T = 300.0 * K
 
 ## band edge energies
-En = [-4.42, -3.9, -2.5] .* eV
-Ep = [-6.15, -5.53, -5.5] .* eV
+En = [-4.00, -4.0, -2.05] .* eV
+Ep = [-6.00, -5.68, -5.65] .* eV
 Ea = [0.0, -4.66, 0.0] .* eV
 
 ## effective densities of density of states
-Nn = [1.0e26, 1.0e24, 1.0e26] ./ (m^3)
-Np = [1.0e26, 2.2e24, 1.0e26] ./ (m^3)
+Nn = [1.0e26, 2.75e24, 2.5e26] ./ (m^3)
+Np = [1.0e26, 3.80e24, 2.5e26] ./ (m^3)
 Na = [0.0, 1.0e27, 0.0] ./ (m^3)
 
 
 ## mobilities
-μn = [1.0e-6, 5.0e-4, 1.0e-8] .* (m^2) / (V * s)
-μp = [1.0e-6, 2.0e-4, 1.0e-8] .* (m^2) / (V * s)
-μa = [0.0, 1.0e-12, 0.0] .* (m^2) / (V * s)
-
+μn = [8.0e-6, 1.0e-3, 2.8e-4] .* (m^2) / (V * s)
+μp = [3.5e-7, 1.0e-3, 2.8e-4] .* (m^2) / (V * s)
+μa = [0.0, 1.0e-17, 0.0] .* (m^2) / (V * s)
 
 ## relative dielectric permittivity
-ε = [5.0, 22.0, 3.5] .* 1.0
+ε = [2.5, 60.0, 11.7] .* 1.0
 
 ## radiative recombination
-r0 = [6.8e-17, 3.6e-18, 6.3e-17] .* cm^3 / s
+r0 = [1.0e-20, 1.0e-20, 1.0e-20] .* cm^3 / s
 
 ## life times and trap densities
-τn = [1.0, 4.0e-8, 1.0] .* s
-τp = [1.0, 4.0e-8, 1.0] .* s
+τn = [1.0e-7, 2.5e-9, 1.0e-6] .* s
+τp = [1.0e-7, 2.5e-9, 1.0e-6] .* s
 
-Augn = [1.0e-28, 0.0, 0.0] .* (cm^6) / (s)
-Augp = [1.0e-28, 0.0, 0.0] .* (cm^6) / (s)
+Augn = [1.0e-31, 1.0e-31, 1.0e-31] .* (cm^6) / (s)
+Augp = [1.0e-31, 1.0e-31, 1.0e-31] .* (cm^6) / (s)
 
 ## SRH trap energies
-nTrapDensity = [1.59e9, 4.48e10, 6.33] ./ (m^3)
-pTrapDensity = [1.59e9, 4.48e10, 6.33] ./ (m^3)
+nTrapDensity = [1.0e20, 4.0e21, 1.0e20] ./ (m^3)
+pTrapDensity = [1.0e20, 4.0e21, 1.0e20] ./ (m^3)
 
 # TODO: Add SRVs
 
@@ -89,8 +88,8 @@ generationPeak = h_ndoping
 generation_uniform = [0.0, 2.64e27, 0.0] ./ (m^3 * s)
 
 ## doping
-Cn = 2.09e24 / (m^3)
-Cp = 2.09e24 / (m^3)
-Ca = 6.0e22 / (m^3)
+Cn = 1.0e24 / (m^3)
+Cp = 3.0e24 / (m^3)
+Ca = 1.6e25 / (m^3)
 
 UT = kB * T / q
