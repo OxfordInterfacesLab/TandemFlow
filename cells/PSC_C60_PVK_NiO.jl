@@ -10,6 +10,7 @@ using ExtendableGrids
 using PyPlot
 using CSV
 using DataFrames
+using Interpolations
 
 ## import utilities
 include("../utils/ct_utils.jl")
@@ -21,13 +22,40 @@ toPlot = Dict(
     "generation" => false,
     "dark-sc" => true,
     "light-sc" => false,
-    "light-bias" => false,
+    "light-bias" => true,
     "light-oc" => false,
     "iv" => false
 )
 
 parameter_file = "../params/Params_PSC_C60_PVK_NiO.jl"
 include(parameter_file)
+
+function plot_Efield(Plotter, ctsys, solution, title)
+
+    grid = ctsys.fvmsys.grid
+    data = ctsys.fvmsys.physics.data
+
+    coord = grid[Coordinates]'
+    ipsi = data.index_psi
+
+    potential = solution[ipsi, :]
+
+    itp = Interpolations.interpolate((vec(coord),), potential, Gridded(Linear()))
+
+    Efield = [Interpolations.gradient(itp, x) for x in coord]
+
+    Efield1D = reshape(Efield, :)
+
+    Plotter.clf()
+    Plotter.plot(coord, Efield1D, linewidth = 3)
+    Plotter.grid()
+    Plotter.xlabel("space [m]")
+    Plotter.ylabel("Electric field [V m-1]")
+    Plotter.legend(fancybox = true, loc = "best", fontsize = 11)
+    Plotter.title(title)
+    Plotter.tight_layout()
+    return Plotter.gcf()
+end
 
 function main(;
         n = 6, Plotter = PyPlot, plotting = false,
@@ -87,7 +115,7 @@ function main(;
     grid = ExtendableGrids.simplexgrid(coord)
 
     ## set different regions in grid
-    cellmask!(grid, [0.0 * μm], [heightLayers[1]], regionDonor, tol = 1.0e-18)     # n-doped region   = 1
+    cellmask!(grid, [0.0], [heightLayers[1]], regionDonor, tol = 1.0e-18)     # n-doped region   = 1
     cellmask!(grid, [heightLayers[1]], [heightLayers[2]], regionIntrinsic, tol = 1.0e-18) # intrinsic region = 2
     cellmask!(grid, [heightLayers[2]], [heightLayers[3]], regionAcceptor, tol = 1.0e-18)  # p-doped region   = 3
 
@@ -116,7 +144,7 @@ function main(;
     ## choose statistics model
     ## possible choices: Boltzmann, FermiDiracOneHalfBednarczyk, FermiDiracOneHalfTeSCA,
     ## FermiDiracMinusOne, Blakemore
-    data.F = [Boltzmann, Boltzmann, FermiDiracMinusOne]
+    data.F = [Boltzmann, Boltzmann, Boltzmann]
 
     ## set relevant recombination mechanisms
     data.bulkRecombination = set_bulk_recombination(;
@@ -156,14 +184,14 @@ function main(;
     params = Params(numberOfRegions, numberOfRegions + 1, numberOfCarriers)
 
     params.temperature = T
-    params.UT = (kB * params.temperature) / q
+    # params.UT = (constants.k_B * params.temperature) / constants.q
     params.chargeNumbers[iphin] = zn
     params.chargeNumbers[iphip] = zp
     params.chargeNumbers[iphia] = za
 
     for ireg in 1:numberOfRegions ## interior region data
 
-        params.dielectricConstant[ireg] = ε[ireg] * ε0
+        params.dielectricConstant[ireg] = ε[ireg] * constants.ε_0
 
         ## effective dos, band edge energy and mobilities
         params.densityOfStates[iphin, ireg] = Nn[ireg]
@@ -264,6 +292,8 @@ function main(;
         plot_energies(Plotter, ctsys, solution, "Dark Short-Circuit", label_energy)
         Plotter.figure()
         plot_densities(Plotter, ctsys, solution, "Dark Short-Circuit", label_density)
+        Plotter.figure()
+        plot_Efield(Plotter, ctsys, solution, "Dark Short-Circuit")
         Plotter.show()
     end
 
@@ -338,6 +368,8 @@ function main(;
         Plotter.figure()
         plot_densities(Plotter, ctsys, solution, "1V Reverse Bias", label_density)
         savefig("psc-1Vrb-densities.png")
+        Plotter.figure()
+        plot_Efield(Plotter, ctsys, solution, "Dark Short-Circuit")
         Plotter.show()
     end
 
