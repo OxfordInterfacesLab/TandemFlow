@@ -3,3 +3,6 @@
 
 # Ignore any file with 'testing' in its name
 *testing*
+
+# Ignore sims folder and everything inside
+sims/

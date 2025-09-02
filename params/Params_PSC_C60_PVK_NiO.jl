@@ -60,7 +60,7 @@ T = 300.0 * K
 ## band edge energies
 En = [-4.00, -4.0, -2.05] .* eV
 Ep = [-6.00, -5.68, -5.65] .* eV
-Ea = [0.0, -4.5, 0.0] .* eV
+Ea = [0.0, -5.4, 0.0] .* eV
 
 ## effective densities of density of states
 Nn = [1.0e26, 2.75e24, 2.5e26] ./ (m^3)
@@ -99,6 +99,6 @@ generation_uniform = [0.0, 2.64e27, 0.0] ./ (m^3 * s)
 ## doping
 Cn = 1.0e24 / (m^3)
 Cp = 3.0e24 / (m^3)
-Ca = 1.6e25 / (m^3)
+Ca = 1.6e23 / (m^3)
 
 UT = constants.k_B * T / constants.q

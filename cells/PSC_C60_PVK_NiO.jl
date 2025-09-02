@@ -144,7 +144,7 @@ function main(;
     ## choose statistics model
     ## possible choices: Boltzmann, FermiDiracOneHalfBednarczyk, FermiDiracOneHalfTeSCA,
     ## FermiDiracMinusOne, Blakemore
-    data.F = [Boltzmann, Boltzmann, Boltzmann]
+    data.F = [FermiDiracOneHalfTeSCA, FermiDiracOneHalfTeSCA, FermiDiracMinusOne]
 
     ## set relevant recombination mechanisms
     data.bulkRecombination = set_bulk_recombination(;
@@ -270,7 +270,7 @@ function main(;
     ## solver parameters - tweak when convergence is an issue
     control = SolverControl()
     control.verbose = verbose
-    control.damp_initial = 0.3
+    control.damp_initial = 0.2
     control.damp_growth = 1.11 # >= 1
     control.maxiters = 1000
 
@@ -278,6 +278,20 @@ function main(;
 
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
+
+    save_cell_profile("sims/PSC_C60_PVK_NiO_dark_sc.csv", solution, ctsys, true, iphia)
+
+    subg = subgrid(grid, [regionIntrinsic]) # determine subgrid of pero region
+
+    mOmega = 0.0
+    for icellVol in subg[CellVolumes]
+        mOmega = mOmega + icellVol
+    end
+
+    intncc = ChargeTransport.integrate(ctsys, storage!, solution)./constants.q
+    
+    int = intncc[iphia, regionIntrinsic]/mOmega
+    println("Average vacancy density = ", int, "m^{-3}.")
 
     ## set axis labels for plots if plotting is set to 'on'
     if plotting
@@ -290,10 +304,13 @@ function main(;
     if plotting && toPlot["dark-sc"]
         Plotter.figure()
         plot_energies(Plotter, ctsys, solution, "Dark Short-Circuit", label_energy)
+        # savefig("psc-dark-sc-bands-1e19.png")
         Plotter.figure()
         plot_densities(Plotter, ctsys, solution, "Dark Short-Circuit", label_density)
+        # savefig("psc-dark-sc-densities-1e19.png")
         Plotter.figure()
         plot_Efield(Plotter, ctsys, solution, "Dark Short-Circuit")
+        # savefig("psc-dark-sc-Efield-1e19.png")
         Plotter.show()
     end
 
@@ -364,14 +381,22 @@ function main(;
     if plotting && toPlot["light-bias"]
         Plotter.figure()
         plot_energies(Plotter, ctsys, solution, "1V Reverse Bias", label_energy)
-        savefig("psc-1Vrb-bands.png")
+        # savefig("psc-1Vrb-bands-1e19.png")
         Plotter.figure()
         plot_densities(Plotter, ctsys, solution, "1V Reverse Bias", label_density)
-        savefig("psc-1Vrb-densities.png")
+        # savefig("psc-1Vrb-densities-1e19.png")
         Plotter.figure()
-        plot_Efield(Plotter, ctsys, solution, "Dark Short-Circuit")
+        plot_Efield(Plotter, ctsys, solution, "1V Reverse Bias")
+        # savefig("psc-1Vrb-Efield-1e19.png")
         Plotter.show()
     end
+
+    save_cell_profile("sims/PSC_C60_PVK_NiO_dark_1Vrb.csv", solution, ctsys, true, iphia)
+
+    intncc = ChargeTransport.integrate(ctsys, storage!, solution)./constants.q
+    
+    int = intncc[iphia, regionIntrinsic]/mOmega
+    println("Average vacancy density = ", int, "m^{-3}.")
 
     ## plot IV curve
     if plotting && toPlot["iv"]

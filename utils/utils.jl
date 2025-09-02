@@ -3,6 +3,25 @@ using ExtendableGrids
 using DataFrames
 using CSV
 using PyPlot
+using LessUnitful: @local_unitfactors, @ufac_str, @ph_str
+
+# ----------------------------------------------------
+#                      UNITS
+# ----------------------------------------------------
+
+constants = ChargeTransport.constants
+
+# used unit factors
+nm = ufac"nm"
+cm = ufac"cm"
+K = ufac"K"
+m = ufac"m"
+V = ufac"V"
+s = ufac"s"
+
+q = constants.q
+
+eV = q * V
 
 # ----------------------------------------------------
 #                      STRUCTS
@@ -91,9 +110,10 @@ Save the cell profile to a CSV file.
 """
 
 #TODO: Add ion functionality
-function save_cell_profile(filename, solution, ctsys, ions=false)
+function save_cell_profile(filename, solution, ctsys, ions=false, iphia=nothing)
     grid = ctsys.fvmsys.grid
     data = ctsys.fvmsys.physics.data
+    params = data.params
     numberOfRegions = grid[NumCellRegions]
 
     iphin = data.bulkRecombination.iphin
@@ -106,6 +126,12 @@ function save_cell_profile(filename, solution, ctsys, ions=false)
     Ev = zeros(0)
     EFn = zeros(0)
     EFp = zeros(0)
+
+    if ions
+        Ea = zeros(0)
+        EFa = zeros(0)
+        a = zeros(0)
+    end
 
     for ireg in 1:numberOfRegions
         subg = subgrid(grid, [ireg])
@@ -123,6 +149,15 @@ function save_cell_profile(filename, solution, ctsys, ions=false)
         append!(Ev, Ev0 ./ q .- solpsi)
         append!(EFn, -soln)
         append!(EFp, -solp)
+
+        if ions
+            Ea0 = get_BEE(iphia, ireg, ctsys) # ion band edge
+            sola = view(solution[iphia, :], subg) # ion quasi-Fermi potential
+
+            append!(Ea, Ea0 ./ q .- solpsi)
+            append!(EFa, -sola)
+            append!(a, get_density(solution, ireg, ctsys, iphia))
+        end
     end
 
     # Build DataFrame
@@ -135,6 +170,21 @@ function save_cell_profile(filename, solution, ctsys, ions=false)
         EFn = EFn,
         EFp = EFp
     )
+
+    if ions
+        df = DataFrame(
+            x = x,
+            n = n,
+            p = p,
+            a = a,
+            Ec = Ec,
+            Ev = Ev,
+            Ea = Ea,
+            EFn = EFn,
+            EFp = EFp,
+            EFa = EFa
+        )
+    end
 
     CSV.write(filename, df)
 end
