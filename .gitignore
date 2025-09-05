@@ -1,2 +1,14 @@
 # Ignore VS Code settings and workspace files
 .vscode/
+
+# Ignore any file with 'testing' in its name
+*testing*
+
+# Ignore sims folder and everything inside
+sims/
+
+# Ignore all PNG files
+*.png
+
+# Ignore Python virtual environment
+.venv/

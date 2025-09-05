@@ -1,18 +1,21 @@
 module CTUtils
 
 ## Helper functions for simulations
-export generation_from_scaps, scaps_to_df_generation
+export generation_from_scaps
 export save_cell_profile, save_iv
 export tanh_diffusion_profile
+export get_cell_characteristics
+export find_Efield, plot_Efield
 
 ## Functions for comparing SCAPS calculations and ChargeTransport calculations
+# TODO: Figure out where these helpers are supposed to go
+export IV
 export CellProfile
 export parse_scaps
 export ct_to_profile
 export set_IV!
 export compare_densities, compare_bands, compare_iv
 
-include("scaps_utils.jl")
-include("sim_utils.jl")
+include("utils.jl")
 
 end

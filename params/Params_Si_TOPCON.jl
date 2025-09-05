@@ -57,6 +57,8 @@ r0 = [4.22e-15, 4.22e-15] .* (cm^3) / (s)
 Augn = [6.0e-30, 7.02e-31] .* (cm^6) / (s)
 Augp = [9.0e-31, 3.5e-30] .* (cm^6) / (s)
 
+absorption = [1.0e6, 0.0]
+
 ## life times and trap densities
 τcz = [1.0, 1.0] .* s  # a-Si (minority), Cz-Si, a-Si (minority)
 τpoly = [1.0, 1.0] .* s  # a-Si (majority), Cz-Si, a-Si (majority)

@@ -1,9 +1,18 @@
+#=
+
+Code for simulation of a Silicon solar cell with a TOPCon structure.
+
+=#
+
+module Si_TOPCON
+
 using ChargeTransport
 using ExtendableGrids
 using PyPlot
 using CSV
 using DataFrames
 
+# import utilities
 include("../utils/ct_utils.jl")
 using .CTUtils
 
@@ -26,16 +35,20 @@ toPlot = Dict(
     "generation" => false,
     "dark-sc" => false,
     "light-sc" => false,
-    "light-bias" => true,
+    "light-bias" => false,
     "light-oc" => false,
-    "iv" => false
+    "iv" => true
 )
 
+# simulation function
 function main(;
         n = 6, Plotter = PyPlot, plotting = true,
         verbose = false, test = false,
         #parameter_file = "../parameter_files/Params_PSC_TiO2_MAPI_spiro.jl", # choose the parameter file
         parameter_file = "../params/Params_Si_TOPCON.jl",
+        generation_file = "../generation/si-topcon-auto.gen",
+        BeerLambertGeneration = true,
+        incidentPhotonFlux = 4.3e21 / (m^2 * s)
     )
 
     if plotting
@@ -47,7 +60,7 @@ function main(;
     include(parameter_file) # include the parameter file we specified
 
     ## contact voltage
-    maxVoltage = 0.95 * V
+    maxVoltage = 0.66 * V
 
     ## primary data for I-V scan protocol
     scanrate = 0.3 * V / s
@@ -98,7 +111,7 @@ function main(;
     bfacemask!(grid, [heightLayers[1]], [heightLayers[1]], bregionJ1, tol = 1.0e-18) # junction
 
     ## Plot node grid
-    if toPlot["grid"]
+    if plotting && toPlot["grid"]
         gridplot(grid, Plotter = Plotter, legend = :lt)
         Plotter.title("Grid")
         Plotter.show()
@@ -106,25 +119,26 @@ function main(;
 
     println("--- Define system and fill in information about model ---")
 
-    ## set up generation data
-    subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
+    if !BeerLambertGeneration
+        ## set up generation data
+        subg1 = subgrid(grid, [regionCz]); subg2 = subgrid(grid, [regionPoly]);
 
-    generation_file = "simulation_data/scaps/si-topcon-auto.gen"
-    generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
+        generation_rate = generation_from_scaps(generation_file) # function to get generation rate from SCAPS file
 
-    gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
-    # gen2 = zeros(length(subg2[Coordinates]) - 1) # set absorption in poly layer to zero
-    gen2 = generation_rate.(subg2[Coordinates]) # initialize generation in poly-Si layer
+        gen1 = generation_rate.(subg1[Coordinates]) # initialize generation in c-Si layer
+        gen2 = generation_rate.(subg2[Coordinates]) # initialize generation in poly-Si layer
 
-    generationData = [gen1'; gen2']
-
-    ## Initialize Data instance and fill in data
-    data = Data(grid, numberOfCarriers, generationData = generationData)
+        generationData = [gen1'; gen2']
+        data = Data(grid, numberOfCarriers, generationData = generationData) # Initialize Data instance and fill in data
+    else
+        data = Data(grid, numberOfCarriers)
+    end
 
     data.modelType = Transient # choices: Transient, Stationary
     carrier_stats = Boltzmann # TODO: choices
     data.F = [carrier_stats, carrier_stats]
 
+    # set simulated recombination mechanisms
     data.bulkRecombination = set_bulk_recombination(;
         iphin = iphin, iphip = iphip,
         bulk_recomb_Auger = true,
@@ -132,8 +146,15 @@ function main(;
         bulk_recomb_SRH = true
     )
 
-    data.generationModel = GenerationUserDefined
+    if BeerLambertGeneration
+        # set generation model
+        data.generationModel = GenerationBeerLambert
+    else
+        # set generation model
+        data.generationModel = GenerationUserDefined
+    end
 
+    # set interface types
     data.boundaryType[bregionPoly] = SchottkyContact
     data.boundaryType[bregionJ1] = InterfaceRecombination
     data.boundaryType[bregionCz] = SchottkyContact
@@ -151,7 +172,6 @@ function main(;
     params.chargeNumbers[iphip] = zp
 
     for ireg in 1:numberOfRegions ## interior region data
-
         params.dielectricConstant[ireg] = ε[ireg] * ε0
 
         ## effective dos, band edge energy and mobilities
@@ -174,7 +194,13 @@ function main(;
 
         params.recombinationAuger[iphin, ireg] = Augn[ireg]
         params.recombinationAuger[iphip, ireg] = Augp[ireg]
+
+        if BeerLambertGeneration
+            params.generationAbsorption[ireg] = absorption[ireg]
+        end
     end
+
+    params.generationIncidentPhotonFlux = [incidentPhotonFlux, 0.0]
 
     ##############################################################
     ## inner boundary region data (we choose the intrinsic values)
@@ -185,7 +211,7 @@ function main(;
     params.bBandEdgeEnergy[iphip, bregionJ1] = Ep[regionPoly]
 
     # Schottky Barrier
-    # TODO: just picked these values - need to justify
+    # TODO: These values were picked based on SCAPS calculations
     params.SchottkyBarrier[bregionCz] = 1.105 * (eV)
     params.SchottkyBarrier[bregionPoly] = -0.018 * (eV)
 
@@ -227,20 +253,12 @@ function main(;
     control.damp_initial = 0.3
     control.damp_growth = 1.11 # >= 1
 
-    if test == false
-        println("*** done\n")
-    end
-
-    ################################################################################
-    if test == false
-        println("Compute solution in thermodynamic equilibrium")
-    end
-    ################################################################################
+    println("--- Solve in equilibrium ---")
 
     solution = equilibrium_solve!(ctsys, control = control)
     inival = solution
 
-    save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
+    #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-dark-sc.csv", solution, ctsys)
 
     ipsi = ctsys.fvmsys.physics.data.index_psi
     Vbi = solution[ipsi, end] - solution[ipsi, 1]
@@ -274,20 +292,12 @@ function main(;
         Plotter.show()
     end
 
-    save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
+    #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-sc.csv", solution, ctsys)
 
-    if test == false
-        println("*** done\n")
-    end
-
-    ################################################################################
-    if test == false
-        println("I-V Measurement Loop")
-    end
-    ################################################################################
+    println("--- IV Curve ---")
 
     ## for saving I-V data
-    IV = zeros(0) # for IV values
+    currents = zeros(0) # for IV values
     biasValues = zeros(0) # for bias values
     VocExceeded = [false, false] # first term for if scaps Voc exceeded, second for if current < 0
 
@@ -332,13 +342,13 @@ function main(;
 
         if Δu >= 0.7400 && VocExceeded[1] == false
             VocExceeded[1] = true
-            save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
+            #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-scaps-oc.csv", solution, ctsys)
         end
 
         if current < 0.0 && VocExceeded[2] == false
             VocExceeded[2] = true
             # Plot bands and carrier densities at Voc
-            save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-ct-oc.csv", solution, ctsys)
+            #save_cell_profile("simulation_data/chargetransport/si-topcon-schottky-illuminated-ct-oc.csv", solution, ctsys)
             println("Graph plotted at V = $(Δu)")
 
             if plotting && toPlot["light-oc"]
@@ -357,33 +367,19 @@ function main(;
             end
         end
 
-        push!(IV, current)
+        push!(currents, current)
         push!(biasValues, Δu)
     end # time loop
 
     # Plot IV curve
     if plotting && toPlot["iv"]
-        plot_IV(Plotter, biasValues, -IV, "bias \$\\Delta u\$ = $(maxVoltage)")
+        plot_IV(Plotter, biasValues, -currents, "bias \$\\Delta u\$ = $(maxVoltage)")
         show()
     end
     
-    save_iv("simulation_data/chargetransport/si-topcon-schottky-iv.csv", biasValues, IV)
+    # save_iv("simulation_data/chargetransport/si-topcon-schottky-iv.csv", biasValues, IV)
 
-    powerDensity = biasValues .* (IV)           # power density function
-    MaxPD, indexPD = findmax(powerDensity)
-
-    Voc = compute_open_circuit_voltage(biasValues, IV)
-
-    IncidentLightPowerDensity = 1000.0 * W / m^2
-
-    efficiency = MaxPD / IncidentLightPowerDensity
-    fillfactor = (biasValues[indexPD] * IV[indexPD]) / (IV[1] * Voc)
-
-    println("\nIsc = $(IV[1])")
-    println("Voc = $(Voc)")
-    println("FF = $(fillfactor)")
-    println("PCE = $(efficiency)")
+    return IV(biasValues, currents)
 end
 
-# DEBUG
-main(n = 12, verbose = false)
+end
