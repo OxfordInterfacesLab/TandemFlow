@@ -5,6 +5,7 @@ export generation_from_scaps
 export save_cell_profile, save_iv
 export tanh_diffusion_profile
 export get_cell_characteristics
+export find_Efield, plot_Efield
 
 ## Functions for comparing SCAPS calculations and ChargeTransport calculations
 # TODO: Figure out where these helpers are supposed to go

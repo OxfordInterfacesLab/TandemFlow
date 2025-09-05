@@ -6,3 +6,9 @@
 
 # Ignore sims folder and everything inside
 sims/
+
+# Ignore all PNG files
+*.png
+
+# Ignore Python virtual environment
+.venv/

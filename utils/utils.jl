@@ -4,6 +4,7 @@ using DataFrames
 using CSV
 using PyPlot
 using LessUnitful: @local_unitfactors, @ufac_str, @ph_str
+using Interpolations
 
 # ----------------------------------------------------
 #                      UNITS
@@ -83,6 +84,51 @@ end
 # ----------------------------------------------------
 #                    SIM UTILITIES
 # ----------------------------------------------------
+"""
+Get the electric field profile
+"""
+function find_Efield(ctsys, solution)
+    grid = ctsys.fvmsys.grid
+    data = ctsys.fvmsys.physics.data
+    params = data.params
+    numberOfRegions = grid[NumCellRegions]
+
+    Efield = zeros(0)
+
+    for ireg in 1:numberOfRegions
+        subg = subgrid(grid, [ireg])
+        coord = subg[Coordinates]'
+
+        potential = view(solution[data.index_psi, :], subg)
+        itp = Interpolations.interpolate((vec(coord),), potential, Gridded(Linear()))
+
+        Efield1D = reshape([Interpolations.gradient(itp, x) for x in coord] .* -1, :)
+
+        append!(Efield, [x[1] for x in Efield1D])
+    end
+
+    return Efield
+end
+
+"""
+Plot the electric field profile
+"""
+function plot_Efield(Plotter, ctsys, solution, title)
+    Efield1D = find_Efield(ctsys, solution)
+
+    grid = ctsys.fvmsys.grid
+    coord = grid[Coordinates]'
+
+    Plotter.clf()
+    Plotter.plot(coord, Efield1D, linewidth = 2)
+    Plotter.grid()
+    Plotter.xlabel("space [m]")
+    Plotter.ylabel("Electric field [V m-1]")
+    Plotter.legend(fancybox = true, loc = "best", fontsize = 11)
+    Plotter.title(title)
+    Plotter.tight_layout()
+    return Plotter.gcf()
+end
 
 """
 tanh function for error function-esque diffusion profile
@@ -126,6 +172,7 @@ function save_cell_profile(filename, solution, ctsys, ions=false, iphia=nothing)
     Ev = zeros(0)
     EFn = zeros(0)
     EFp = zeros(0)
+    Efield = zeros(0)
 
     if ions
         Ea = zeros(0)
@@ -142,11 +189,11 @@ function save_cell_profile(filename, solution, ctsys, ions=false, iphia=nothing)
         solp = view(solution[iphip, :], subg) # quasi-Fermi potential for holes
         soln = view(solution[iphin, :], subg) # quasi-Fermi potential for electrons
 
-        append!(x, subg[Coordinates]')
+        append!(x, subg[Coordinates]') # convert to μm
         append!(n, get_density(solution, ireg, ctsys, iphin))
         append!(p, get_density(solution, ireg, ctsys, iphip))
-        append!(Ec, Ec0 ./ q .- solpsi)
-        append!(Ev, Ev0 ./ q .- solpsi)
+        append!(Ec, (Ec0 ./ q .- solpsi))
+        append!(Ev, (Ev0 ./ q .- solpsi))
         append!(EFn, -soln)
         append!(EFp, -solp)
 
@@ -154,11 +201,13 @@ function save_cell_profile(filename, solution, ctsys, ions=false, iphia=nothing)
             Ea0 = get_BEE(iphia, ireg, ctsys) # ion band edge
             sola = view(solution[iphia, :], subg) # ion quasi-Fermi potential
 
-            append!(Ea, Ea0 ./ q .- solpsi)
+            append!(Ea, (Ea0 ./ q .- solpsi))
             append!(EFa, -sola)
             append!(a, get_density(solution, ireg, ctsys, iphia))
         end
     end
+
+    Efield = [i[1] for i in find_Efield(ctsys, solution)]
 
     # Build DataFrame
     df = DataFrame(
@@ -168,7 +217,8 @@ function save_cell_profile(filename, solution, ctsys, ions=false, iphia=nothing)
         Ec = Ec,
         Ev = Ev,
         EFn = EFn,
-        EFp = EFp
+        EFp = EFp,
+        Efield = Efield
     )
 
     if ions
@@ -182,7 +232,8 @@ function save_cell_profile(filename, solution, ctsys, ions=false, iphia=nothing)
             Ea = Ea,
             EFn = EFn,
             EFp = EFp,
-            EFa = EFa
+            EFa = EFa,
+            Efield = Efield
         )
     end
 
