@@ -1,0 +1,31 @@
+name = "PerovskiteTMMlite"
+uuid = "eb508cdc-8818-440a-b2c4-76a12089dc6b"
+version = "0.1.0"
+authors = ["Shivam Shaligram"]
+
+# --- package runtime deps (used by src/) ---
+#   CSV, DataFrames   : materials.jl reads wl,n,k CSVs
+# --- example deps (used by examples/) ---
+#   Plots             : figures (GR backend, no system dependencies)
+#   DelimitedFiles    : write result CSVs
+#   Printf            : formatted console summaries
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+
+[compat]
+CSV = "0.10"
+DataFrames = "1"
+DelimitedFiles = "1"
+Plots = "1"
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
